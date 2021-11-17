@@ -1,0 +1,16 @@
+NAT: Type
+  <P: Type> -> (s: P -> P) -> (z: P) -> P
+
+NOT(b: Bool): Bool
+  (P, t, f) b<(b) P(NOT(b))>(f, t)
+
+EXP(a: NAT, b: NAT): NAT
+  (P) b(P -> P, a(P))
+
+ODD(n: NAT): Bool
+  n!(NOT, false)
+
+fused_inc: _
+  let A = (P, S, Z) S(S(S(S(S(S(S(S(S(Z)))))))))
+  let B = (P, S, Z) S(S(S(S(S(S(S(S(S(Z)))))))))
+  ODD(EXP(a,b))
