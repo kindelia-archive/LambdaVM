@@ -13,4 +13,4 @@ ODD(n: NAT): Bool
 fused_inc: _
   let A = (P, S, Z) S(S(S(S(S(S(S(S(S(Z)))))))))
   let B = (P, S, Z) S(S(S(S(S(S(S(S(S(Z)))))))))
-  ODD(EXP(a,b))
+  ODD(EXP(A,B))

@@ -40,4 +40,7 @@ var main : string = `
 
 var val = lambda_to_optimal(main);
 var mem = read(val);
-var gas = normal(mem, 0);
+var gas = normal_ffi(mem, 0);
+
+console.log("cost: " + gas);
+console.log("norm: " + show_as_lambda(mem));
