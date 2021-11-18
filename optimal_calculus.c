@@ -305,8 +305,8 @@ Lnk reduce(Mem* MEM, Loc host) {
               link(MEM, ctr1+i, lnk(DP1, 0, 0, leti));
               link(MEM, leti+2, get_lnk(MEM,expr,i));
             }
-            subst(MEM, get_lnk(MEM,term,0), lnk(CTR, ctr0, func, arit));
-            subst(MEM, get_lnk(MEM,term,1), lnk(CTR, ctr1, func, arit));
+            subst(MEM, get_lnk(MEM,term,0), lnk(CTR, func, arit, ctr0));
+            subst(MEM, get_lnk(MEM,term,1), lnk(CTR, func, arit, ctr1));
             link(MEM, host, lnk(CTR, func, arit, get_tag(term) == DP0 ? ctr0 : ctr1));
             clear(MEM, get_loc(term,0), 3);
             clear(MEM, get_loc(expr,0), arit);
@@ -327,42 +327,28 @@ Lnk reduce(Mem* MEM, Loc host) {
             u64 loc$0$ = reduce(MEM, loc$0);
             switch (get_tag(loc$0$) == CTR ? get_ex0(loc$0$) : -1) {
               case 0: {
-                u64 fld_loc$2 = get_loc(loc$0$, 0);
-                u64 fld_arg$3 = get_lnk(MEM, loc$0$, 0);
                 ++GAS;
-                u64 ctr$4 = alloc(MEM, 0);
-                u64 ctr$5 = alloc(MEM, 1);
-                link(MEM, ctr$5+0, fld_arg$3);
-                u64 ctr$6 = alloc(MEM, 2);
-                link(MEM, ctr$6+0, lnk(CTR, 0, 0, ctr$4));
-                link(MEM, ctr$6+1, lnk(CTR, 1, 1, ctr$5));
-                link(MEM, host, lnk(CTR, 0, 2, ctr$6));
-                clear(MEM, get_loc(loc$0$, 0), 1);
+                u64 ctr$2 = alloc(MEM, 0);
+                link(MEM, host, lnk(CTR, 0, 0, ctr$2));
+                clear(MEM, get_loc(loc$0$, 0), 0);
                 clear(MEM, get_loc(term, 0), 1);
                 continue;
               }
               case 1: {
-                u64 fld_loc$7 = get_loc(loc$0$, 0);
-                u64 fld_arg$8 = get_lnk(MEM, loc$0$, 0);
+                u64 fld_loc$3 = get_loc(loc$0$, 0);
+                u64 fld_arg$4 = get_lnk(MEM, loc$0$, 0);
                 ++GAS;
-                u64 cal$9 = alloc(MEM, 1);
-                link(MEM, cal$9+0, fld_arg$8);
-                u64 cal$10 = alloc(MEM, 1);
-                link(MEM, cal$10+0, lnk(CAL, 0, 1, cal$9));
-                link(MEM, host, lnk(CAL, 1, 1, cal$10));
+                u64 dup$5 = alloc(MEM, 3);
+                link(MEM, dup$5+2, fld_arg$4);
+                u64 cal$6 = alloc(MEM, 1);
+                link(MEM, cal$6+0, lnk(DP0, 127, 0, dup$5));
+                u64 cal$7 = alloc(MEM, 1);
+                link(MEM, cal$7+0, lnk(DP1, 127, 0, dup$5));
+                u64 cal$8 = alloc(MEM, 2);
+                link(MEM, cal$8+0, lnk(CAL, 0, 1, cal$6));
+                link(MEM, cal$8+1, lnk(CAL, 0, 1, cal$7));
+                link(MEM, host, lnk(CAL, 1, 2, cal$8));
                 clear(MEM, get_loc(loc$0$, 0), 1);
-                clear(MEM, get_loc(term, 0), 1);
-                continue;
-              }
-              case 2: {
-                ++GAS;
-                u64 ctr$11 = alloc(MEM, 0);
-                u64 ctr$12 = alloc(MEM, 0);
-                u64 ctr$13 = alloc(MEM, 2);
-                link(MEM, ctr$13+0, lnk(CTR, 1, 0, ctr$11));
-                link(MEM, ctr$13+1, lnk(CTR, 2, 0, ctr$12));
-                link(MEM, host, lnk(CTR, 0, 2, ctr$13));
-                clear(MEM, get_loc(loc$0$, 0), 0);
                 clear(MEM, get_loc(term, 0), 1);
                 continue;
               }
@@ -372,68 +358,52 @@ Lnk reduce(Mem* MEM, Loc host) {
           case 1: {
             u64 loc$0 = get_loc(term, 0);
             u64 arg$1 = get_lnk(MEM, term, 0);
+            u64 loc$2 = get_loc(term, 1);
+            u64 arg$3 = get_lnk(MEM, term, 1);
             u64 loc$0$ = reduce(MEM, loc$0);
             switch (get_tag(loc$0$) == CTR ? get_ex0(loc$0$) : -1) {
               case 0: {
-                u64 fld_loc$2 = get_loc(loc$0$, 0);
-                u64 fld_arg$3 = get_lnk(MEM, loc$0$, 0);
-                u64 fld_loc$4 = get_loc(loc$0$, 1);
-                u64 fld_arg$5 = get_lnk(MEM, loc$0$, 1);
-                ++GAS;
-                u64 ctr$6 = alloc(MEM, 1);
-                link(MEM, ctr$6+0, fld_arg$5);
-                u64 ctr$7 = alloc(MEM, 2);
-                link(MEM, ctr$7+0, fld_arg$3);
-                link(MEM, ctr$7+1, lnk(CTR, 0, 1, ctr$6));
-                link(MEM, host, lnk(CTR, 0, 2, ctr$7));
-                clear(MEM, get_loc(loc$0$, 0), 2);
-                clear(MEM, get_loc(term, 0), 1);
-                continue;
-              }
-            }
-          }
-
-          case 2: {
-            u64 loc$0 = get_loc(term, 0);
-            u64 arg$1 = get_lnk(MEM, term, 0);
-            ++GAS;
-            u64 cal$2 = alloc(MEM, 1);
-            link(MEM, cal$2+0, arg$1);
-            u64 cal$3 = alloc(MEM, 1);
-            link(MEM, cal$3+0, lnk(CAL, 0, 1, cal$2));
-            link(MEM, host, lnk(CAL, 3, 1, cal$3));
-            clear(MEM, get_loc(term, 0), 1);
-            continue;
-          }
-
-          case 3: {
-            u64 loc$0 = get_loc(term, 0);
-            u64 arg$1 = get_lnk(MEM, term, 0);
-            u64 loc$0$ = reduce(MEM, loc$0);
-            switch (get_tag(loc$0$) == CTR ? get_ex0(loc$0$) : -1) {
-              case 0: {
-                u64 fld_loc$2 = get_loc(loc$0$, 0);
-                u64 fld_arg$3 = get_lnk(MEM, loc$0$, 0);
-                u64 fld_loc$4 = get_loc(loc$0$, 1);
-                u64 fld_arg$5 = get_lnk(MEM, loc$0$, 1);
-                u64 fld_loc$2$ = reduce(MEM, fld_loc$2);
-                switch (get_tag(fld_loc$2$) == CTR ? get_ex0(fld_loc$2$) : -1) {
+                u64 loc$2$ = reduce(MEM, loc$2);
+                switch (get_tag(loc$2$) == CTR ? get_ex0(loc$2$) : -1) {
                   case 0: {
                     ++GAS;
-                    u64 cal$6 = alloc(MEM, 1);
-                    link(MEM, cal$6+0, fld_arg$5);
-                    link(MEM, host, lnk(CAL, 2, 1, cal$6));
-                    clear(MEM, get_loc(fld_loc$2$, 0), 0);
-                    clear(MEM, get_loc(loc$0$, 0), 2);
-                    clear(MEM, get_loc(term, 0), 1);
+                    u64 ctr$4 = alloc(MEM, 0);
+                    link(MEM, host, lnk(CTR, 1, 0, ctr$4));
+                    clear(MEM, get_loc(loc$2$, 0), 0);
+                    clear(MEM, get_loc(loc$0$, 0), 0);
+                    clear(MEM, get_loc(term, 0), 2);
                     continue;
                   }
                   case 1: {
                     ++GAS;
-                    link(MEM, host, fld_arg$5);
-                    clear(MEM, get_loc(fld_loc$2$, 0), 0);
-                    clear(MEM, get_loc(loc$0$, 0), 2);
-                    clear(MEM, get_loc(term, 0), 1);
+                    u64 ctr$5 = alloc(MEM, 0);
+                    link(MEM, host, lnk(CTR, 1, 0, ctr$5));
+                    clear(MEM, get_loc(loc$2$, 0), 0);
+                    clear(MEM, get_loc(loc$0$, 0), 0);
+                    clear(MEM, get_loc(term, 0), 2);
+                    continue;
+                  }
+                }
+              }
+              case 1: {
+                u64 loc$2$ = reduce(MEM, loc$2);
+                switch (get_tag(loc$2$) == CTR ? get_ex0(loc$2$) : -1) {
+                  case 0: {
+                    ++GAS;
+                    u64 ctr$6 = alloc(MEM, 0);
+                    link(MEM, host, lnk(CTR, 1, 0, ctr$6));
+                    clear(MEM, get_loc(loc$2$, 0), 0);
+                    clear(MEM, get_loc(loc$0$, 0), 0);
+                    clear(MEM, get_loc(term, 0), 2);
+                    continue;
+                  }
+                  case 1: {
+                    ++GAS;
+                    u64 ctr$7 = alloc(MEM, 0);
+                    link(MEM, host, lnk(CTR, 0, 0, ctr$7));
+                    clear(MEM, get_loc(loc$2$, 0), 0);
+                    clear(MEM, get_loc(loc$0$, 0), 0);
+                    clear(MEM, get_loc(term, 0), 2);
                     continue;
                   }
                 }
