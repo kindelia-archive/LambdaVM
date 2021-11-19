@@ -100,13 +100,14 @@ Lnk deref(Mem* mem, Loc loc) {
   return array_read(&mem->lnk, loc);
 }
 
-void link(Mem* mem, Loc loc, Lnk link) {
+u64 link(Mem* mem, Loc loc, Lnk link) {
   array_write(&mem->lnk, loc, link);
   switch (get_tag(link)) {
     case VAR: array_write(&mem->lnk, get_loc(link,0), lnk(ARG,0,0,loc)); break;
     case DP0: array_write(&mem->lnk, get_loc(link,0), lnk(ARG,0,0,loc)); break;
     case DP1: array_write(&mem->lnk, get_loc(link,1), lnk(ARG,0,0,loc)); break;
   }
+  return link;
 }
 
 Loc alloc(Mem* mem, u64 size) {
@@ -227,8 +228,7 @@ Lnk reduce(Mem* MEM, Loc host) {
             link(MEM, app1+1, lnk(DP1, get_ex0(func), 0, let0));
             link(MEM, par0+0, lnk(APP, 0, 0, app0));
             link(MEM, par0+1, lnk(APP, 0, 0, app1));
-            link(MEM, host, lnk(PAR, get_ex0(func), 0, par0));
-            return deref(MEM, host);
+            return link(MEM, host, lnk(PAR, get_ex0(func), 0, par0));
           }
         }
         break;
@@ -301,8 +301,7 @@ Lnk reduce(Mem* MEM, Loc host) {
               link(MEM, par0+1, lnk(DP0,get_ex0(term),0,let1));               // w:par0[1] w:let1[0]
               subst(MEM, term_lnk_0, lnk(PAR,get_ex0(expr),0,par0));          // r:let0[0] d:par0
 
-              link(MEM, host, lnk(PAR, get_ex0(expr), 0, get_tag(term) == DP0 ? par0 : par1));
-              return deref(MEM, host);
+              return link(MEM, host, lnk(PAR, get_ex0(expr), 0, get_tag(term) == DP0 ? par0 : par1));
             }
           }
           case CTR: {
@@ -312,9 +311,8 @@ Lnk reduce(Mem* MEM, Loc host) {
             if (arit == 0) {
               subst(MEM, get_lnk(MEM,term,0), lnk(CTR, func, 0, 0));
               subst(MEM, get_lnk(MEM,term,1), lnk(CTR, func, 0, 0));
-              link(MEM, host, lnk(CTR, func, 0, 0));
               clear(MEM, get_loc(term,0), 3);
-              return deref(MEM, host);
+              return link(MEM, host, lnk(CTR, func, 0, 0));
             } else {
               u64 ctr0 = get_loc(expr,0);
               u64 ctr1 = alloc(MEM, arit);
@@ -327,8 +325,7 @@ Lnk reduce(Mem* MEM, Loc host) {
                 link(MEM, ctr1+i, lnk(DP1, 0, 0, leti));
                 link(MEM, leti+2, expr_lnk_i);
               }
-              link(MEM, host, lnk(CTR, func, arit, get_tag(term) == DP0 ? ctr0 : ctr1));
-              return deref(MEM, host);
+              return link(MEM, host, lnk(CTR, func, arit, get_tag(term) == DP0 ? ctr0 : ctr1));
             }
           }
         }
