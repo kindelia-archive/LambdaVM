@@ -135,59 +135,47 @@ void clear(Mem* mem, Loc loc, u64 size) {
 // Garbage Collection
 // ------------------
 
-void collect(Mem* mem, Lnk term, Loc host) {
+void collect(Mem* mem, Lnk term) {
   switch (get_tag(term)) {
     case LAM: {
       if (get_tag(get_lnk(mem,term,0)) != NIL) {
         link(mem, get_loc(get_lnk(mem,term,0),0), lnk(NIL,0,0,0));
       }
-      collect(mem, get_lnk(mem,term,1), get_loc(term,1));
+      collect(mem, get_lnk(mem,term,1));
       clear(mem, get_loc(term,0), 2);
       break;
     }
     case APP: {
-      collect(mem, get_lnk(mem,term,0), get_loc(term,0));
-      collect(mem, get_lnk(mem,term,1), get_loc(term,1));
+      collect(mem, get_lnk(mem,term,0));
+      collect(mem, get_lnk(mem,term,1));
       clear(mem, get_loc(term,0), 2);
       break;
     }
     case PAR: {
-      collect(mem, get_lnk(mem,term,0), get_loc(term,0));
-      collect(mem, get_lnk(mem,term,1), get_loc(term,1));
+      collect(mem, get_lnk(mem,term,0));
+      collect(mem, get_lnk(mem,term,1));
       clear(mem, get_loc(term,0), 2);
-      if (host) {
-        link(mem, host, lnk(NIL,0,0,0));
-      }
       break;
     }
     case DP0: {
       link(mem, get_loc(term,0), lnk(NIL,0,0,0));
-      if (host) {
-        clear(mem, host, 1);
-      }
       break;
     }
     case DP1: {
       link(mem, get_loc(term,1), lnk(NIL,0,0,0));
-      if (host) {
-        clear(mem, host, 1);
-      }
       break;
     }
     case CTR:
     case CAL: {
       Ex1 arity = get_ex1(term);
       for (u64 i = 0; i < arity; ++i) {
-        collect(mem, get_lnk(mem,term,i), get_loc(term,i));
+        collect(mem, get_lnk(mem,term,i));
       }
       clear(mem, get_loc(term,0), arity);
       break;
     }
     case VAR: {
       link(mem, get_loc(term,0), lnk(NIL,0,0,0));
-      if (host) {
-        clear(mem, host, 1);
-      }
       break;
     }
   }
@@ -200,7 +188,7 @@ void subst(Mem* mem, Lnk lnk, Lnk val) {
   if (get_tag(lnk) != NIL) {
     link(mem, get_loc(lnk,0), val);
   } else {
-    collect(mem, val, 0);
+    collect(mem, val);
   }
 }
 

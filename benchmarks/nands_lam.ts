@@ -9,13 +9,13 @@ var main : string = `
   let S = λn: λz: λs: (s n)
   let nand = λa: (a λb:(b λt:λf:f λt:λf:f) λb:(b λt:λf:f λt:λf:t))
   let slow = (Y λslow: λn: (n λx:x λpred:((slow pred) (slow pred))))
+  
+  (slow (S (S (S (S (S (S (S (S (S Z))))))))))
   (slow (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S Z))))))))))))))))))))))))
 `;
 
-console.log(run(true, main));
+//var main : string = `
+  //λt:λA:λB:((t ((λa:λb:a A) B)) b)
+//`;
 
-// mem old commit: 35652931
-// mem new commit: 35652929
-
-//2384767
-//2384765
+console.log(run(main, {c: false, core: false}));

@@ -2,6 +2,7 @@
 // ====================
 
 import {pad} from "./utils.ts"
+import {show_tag, show_lnk, show_mem, show_term} from "./syntax.ts";
 
 export type MAP<T> = Record<string, T>;
 
@@ -152,59 +153,47 @@ export function init(capacity: number = 2048 * array_megabyte) {
 // Garbage Collection
 // ------------------
 
-export function collect(MEM: Mem, term: Lnk, host: Loc) {
+export function collect(MEM: Mem, term: Lnk) {
   switch (get_tag(term)) {
     case LAM: {
       if (get_tag(get_lnk(MEM,term,0)) !== NIL) {
         link(MEM, get_loc(get_lnk(MEM,term,0),0), lnk(NIL,0,0,0));
       }
-      collect(MEM, get_lnk(MEM,term,1), get_loc(term,1));
+      collect(MEM, get_lnk(MEM,term,1));
       clear(MEM, get_loc(term,0), 2);
       break;
     }
     case APP: {
-      collect(MEM, get_lnk(MEM,term,0), get_loc(term,0));
-      collect(MEM, get_lnk(MEM,term,1), get_loc(term,1));
+      collect(MEM, get_lnk(MEM,term,0));
+      collect(MEM, get_lnk(MEM,term,1));
       clear(MEM, get_loc(term,0), 2);
       break;
     }
     case PAR: {
-      collect(MEM, get_lnk(MEM,term,0), get_loc(term,0));
-      collect(MEM, get_lnk(MEM,term,1), get_loc(term,1));
+      collect(MEM, get_lnk(MEM,term,0));
+      collect(MEM, get_lnk(MEM,term,1));
       clear(MEM, get_loc(term,0), 2);
-      if (host) {
-        link(MEM, host, lnk(NIL,0,0,0));
-      }
       break;
     }
     case DP0: {
       link(MEM, get_loc(term,0), lnk(NIL,0,0,0));
-      if (host) {
-        clear(MEM, host, 1);
-      }
       break;
     }
     case DP1: {
       link(MEM, get_loc(term,1), lnk(NIL,0,0,0));
-      if (host) {
-        clear(MEM, host, 1);
-      }
       break;
     }
     case CTR:
     case CAL: {
       var arity = get_ex1(term);
       for (var i = 0; i < arity; ++i) {
-        collect(MEM, get_lnk(MEM,term,i), get_loc(term,i));
+        collect(MEM, get_lnk(MEM,term,i));
       }
       clear(MEM, get_loc(term,0), arity);
       break;
     }
     case VAR: {
       link(MEM, get_loc(term,0), lnk(NIL,0,0,0));
-      if (host) {
-        clear(MEM, host, 1);
-      }
       break;
     }
   }
@@ -214,14 +203,13 @@ export function collect(MEM: Mem, term: Lnk, host: Loc) {
 // ---------
 
 export function subst(MEM: Mem, lnk: Lnk, val: Lnk) {
+  //console.log("subst", show_tag(get_tag(lnk)), show_tag(get_tag(val)));
   if (get_tag(lnk) !== NIL) {
     link(MEM, get_loc(lnk,0), val);
   } else {
-    collect(MEM, val, 0);
+    collect(MEM, val);
   }
 }
-
-import {show_lnk, show_mem, show_term} from "./syntax.ts";
 
 export function reduce(MEM: Mem, host: Loc) : Lnk {
   while (true) {
