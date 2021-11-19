@@ -134,15 +134,15 @@ export function init(capacity: number = 2048 * array_megabyte) {
   var MEM = {
     lnk: array_alloc(capacity),
     use: [
-      array_alloc(128 * array_megabyte),
-      array_alloc(128 * array_megabyte),
-      array_alloc(128 * array_megabyte),
-      array_alloc(128 * array_megabyte),
-      array_alloc(128 * array_megabyte),
-      array_alloc(128 * array_megabyte),
-      array_alloc(128 * array_megabyte),
-      array_alloc(128 * array_megabyte),
-      array_alloc(128 * array_megabyte),
+      array_alloc(256 * array_megabyte),
+      array_alloc(256 * array_megabyte),
+      array_alloc(256 * array_megabyte),
+      array_alloc(256 * array_megabyte),
+      array_alloc(256 * array_megabyte),
+      array_alloc(256 * array_megabyte),
+      array_alloc(256 * array_megabyte),
+      array_alloc(256 * array_megabyte),
+      array_alloc(256 * array_megabyte),
     ]
   }
   array_push(MEM.lnk, 0);
@@ -225,6 +225,10 @@ import {show_lnk, show_mem, show_term} from "./syntax.ts";
 
 export function reduce(MEM: Mem, host: Loc) : Lnk {
   while (true) {
+
+    // TODO: remove
+    //if (GAS > 350) { throw new Error("deu ruim"); }
+
     var term = deref(MEM, host);
     switch (get_tag(term)) {
       case APP: {
@@ -248,24 +252,36 @@ export function reduce(MEM: Mem, host: Loc) : Lnk {
           // !A<x0 x1> = c
           // &A<(a x0) (b x1)>
           case PAR: {
-            ++GAS;
             //console.log("[app-par] " + get_loc(term,0) + " " + get_loc(func,0));
+            ++GAS;
+            var app0 = get_loc(term, 0);
+            var app1 = get_loc(func, 0);
             var let0 = alloc(MEM, 3);
-            var app0 = alloc(MEM, 2);
-            var app1 = alloc(MEM, 2);
             var par0 = alloc(MEM, 2);
-            link(MEM, let0+2, get_lnk(MEM, term, 1));
-            link(MEM, app0+0, get_lnk(MEM, func, 0));
-            link(MEM, app0+1, lnk(DP0, get_ex0(func), 0, let0));
-            link(MEM, app1+0, get_lnk(MEM, func, 1));
-            link(MEM, app1+1, lnk(DP1, get_ex0(func), 0, let0));
-            link(MEM, par0+0, lnk(APP, 0, 0, app0));
-            link(MEM, par0+1, lnk(APP, 0, 0, app1));
+            link(MEM, let0+2, get_lnk(MEM, term, 1));            // w: let0[2] r: app0[1]
+            link(MEM, app0+1, lnk(DP0, get_ex0(func), 0, let0)); // w: app0[1] let0[0]
+            link(MEM, app0+0, get_lnk(MEM, func, 0));            // w: app0[0] r: app1[0]
+            link(MEM, app1+0, get_lnk(MEM, func, 1));            // w: app1[0] r: app1[1]
+            link(MEM, app1+1, lnk(DP1, get_ex0(func), 0, let0)); // w: app1[1] let0[1]
+            link(MEM, par0+0, lnk(APP, 0, 0, app0));             // w: par0[0]
+            link(MEM, par0+1, lnk(APP, 0, 0, app1));             // w: par0[1]
             link(MEM, host, lnk(PAR, get_ex0(func), 0, par0));
-            clear(MEM, get_loc(term,0), 2);
-            clear(MEM, get_loc(func,0), 2);
-            //console.log(show_term(MEM, deref(MEM, 0)));
             return deref(MEM, host);
+            //var let0 = alloc(MEM, 3);
+            //var app0 = alloc(MEM, 2);
+            //var app1 = alloc(MEM, 2);
+            //var par0 = alloc(MEM, 2);
+            //link(MEM, let0+2, get_lnk(MEM, term, 1));
+            //link(MEM, app0+0, get_lnk(MEM, func, 0));
+            //link(MEM, app0+1, lnk(DP0, get_ex0(func), 0, let0));
+            //link(MEM, app1+0, get_lnk(MEM, func, 1));
+            //link(MEM, app1+1, lnk(DP1, get_ex0(func), 0, let0));
+            //link(MEM, par0+0, lnk(APP, 0, 0, app0));
+            //link(MEM, par0+1, lnk(APP, 0, 0, app1));
+            //link(MEM, host, lnk(PAR, get_ex0(func), 0, par0));
+            //clear(MEM, get_loc(term,0), 2);
+            //clear(MEM, get_loc(func,0), 2);
+            //return deref(MEM, host);
           }
         }
         break;
@@ -276,31 +292,53 @@ export function reduce(MEM: Mem, host: Loc) : Lnk {
         switch (get_tag(expr)) {
           // !A<r s> = λx: f
           // --------------- LET-LAM
+          // !A<f0 f1> = f
           // r <- λx0: f0
           // s <- λx1: f1
           // x <- &A<x0 x1>
-          // !A<f0 f1> = f
           // ~
           case LAM: {
-            ++GAS;
             //console.log("[let-lam] " + get_loc(term,0) + " " + get_loc(expr,0));
+            ++GAS;
+            var let0 = get_loc(term, 0);
+            var par0 = get_loc(expr, 0);
             var lam0 = alloc(MEM, 2);
             var lam1 = alloc(MEM, 2);
-            var par0 = alloc(MEM, 2);
-            var let0 = alloc(MEM, 3);
-            link(MEM, lam0+1, lnk(DP0, get_ex0(term), 0, let0));
-            link(MEM, lam1+1, lnk(DP1, get_ex0(term), 0, let0));
-            link(MEM, par0+0, lnk(VAR, 0, 0, lam0));
-            link(MEM, par0+1, lnk(VAR, 0, 0, lam1));
-            link(MEM, let0+2, get_lnk(MEM, expr, 1));
-            subst(MEM, get_lnk(MEM,term,0), lnk(LAM, 0, 0, lam0));
-            subst(MEM, get_lnk(MEM,term,1), lnk(LAM, 0, 0, lam1));
-            subst(MEM, get_lnk(MEM,expr,0), lnk(PAR, get_ex0(term), 0, par0));
-            link(MEM, host, lnk(LAM, 0, 0, get_tag(term) === DP0 ? lam0 : lam1));
-            clear(MEM, get_loc(term,0), 3);
-            clear(MEM, get_loc(expr,0), 2);
-            //console.log(show_term(MEM, deref(MEM, 0)));
+
+            link(MEM, let0+2, get_lnk(MEM, expr, 1));                 // r: par0[1] w: let0[2]
+            link(MEM, par0+1, lnk(VAR, 0, 0, lam1));                  // w: par0[1] lam1[0]
+
+            var expr_lnk_0 = get_lnk(MEM, expr, 0);
+            link(MEM, par0+0, lnk(VAR, 0, 0, lam0));                  // w: par0[0] lam0[0]
+            subst(MEM, expr_lnk_0, lnk(PAR, get_ex0(term), 0, par0)); // r: par0[0]
+
+            var term_lnk_0 = get_lnk(MEM,term,0);
+            link(MEM, lam0+1, lnk(DP0, get_ex0(term), 0, let0));      // w: lam0[1] let0[0]
+            subst(MEM, term_lnk_0, lnk(LAM, 0, 0, lam0));             // r: let0[0]
+
+            var term_lnk_1 = get_lnk(MEM,term,1);                      
+            link(MEM, lam1+1, lnk(DP1, get_ex0(term), 0, let0));      // w: lam1[1] let0[1]
+            subst(MEM, term_lnk_1, lnk(LAM, 0, 0, lam1));             // r: let0[1]
+
+            link(MEM, host, lnk(LAM, 0, 0, get_tag(term) == DP0 ? lam0 : lam1));
             continue;
+
+            //var lam0 = alloc(MEM, 2);
+            //var lam1 = alloc(MEM, 2);
+            //var par0 = alloc(MEM, 2);
+            //var let0 = alloc(MEM, 3);
+            //link(MEM, lam0+1, lnk(DP0, get_ex0(term), 0, let0));
+            //link(MEM, lam1+1, lnk(DP1, get_ex0(term), 0, let0));
+            //link(MEM, par0+0, lnk(VAR, 0, 0, lam0));
+            //link(MEM, par0+1, lnk(VAR, 0, 0, lam1));
+            //link(MEM, let0+2, get_lnk(MEM, expr, 1));
+            //subst(MEM, get_lnk(MEM,term,0), lnk(LAM, 0, 0, lam0));
+            //subst(MEM, get_lnk(MEM,term,1), lnk(LAM, 0, 0, lam1));
+            //subst(MEM, get_lnk(MEM,expr,0), lnk(PAR, get_ex0(term), 0, par0));
+            //link(MEM, host, lnk(LAM, 0, 0, get_tag(term) === DP0 ? lam0 : lam1));
+            //clear(MEM, get_loc(term,0), 3);
+            //clear(MEM, get_loc(expr,0), 2);
+            //continue;
           }
           // !A<x y> = !B<a b>
           // ----------------- LET-PAR
@@ -315,9 +353,9 @@ export function reduce(MEM: Mem, host: Loc) : Lnk {
           //   !A<xB yB> = b
           //   ~
           case PAR: {
-            ++GAS;
             //console.log("[let-par] " + get_loc(term,0) + " " + get_loc(expr,0));
             if (get_ex0(term) === get_ex0(expr)) {
+              ++GAS;
               subst(MEM, get_lnk(MEM,term,0), get_lnk(MEM,expr,0));
               subst(MEM, get_lnk(MEM,term,1), get_lnk(MEM,expr,1));
               link(MEM, host, get_lnk(MEM, expr, get_tag(term) === DP0 ? 0 : 1));
@@ -326,23 +364,46 @@ export function reduce(MEM: Mem, host: Loc) : Lnk {
               //return deref(MEM, host);
               continue;
             } else {
+              ++GAS;
+
               var par0 = alloc(MEM, 2);
-              var par1 = alloc(MEM, 2);
-              var let0 = alloc(MEM, 3);
+              var let0 = get_loc(term,0);
+              var par1 = get_loc(expr,0);
               var let1 = alloc(MEM, 3);
-              link(MEM, par0+0, lnk(DP0,get_ex0(term),0,let0));
-              link(MEM, par0+1, lnk(DP0,get_ex0(term),0,let1));
-              link(MEM, par1+0, lnk(DP1,get_ex0(term),0,let0));
-              link(MEM, par1+1, lnk(DP1,get_ex0(term),0,let1));
-              link(MEM, let0+2, get_lnk(MEM,expr,0));
-              link(MEM, let1+2, get_lnk(MEM,expr,1));
-              subst(MEM, get_lnk(MEM,term,0), lnk(PAR,get_ex0(expr),0,par0));
-              subst(MEM, get_lnk(MEM,term,1), lnk(PAR,get_ex0(expr),0,par1));
+
+              link(MEM, let0+2, get_lnk(MEM,expr,0));                         // w:let0[2] r:par1[0]
+              link(MEM, let1+2, get_lnk(MEM,expr,1));                         // w:let1[2] r:par1[1]
+
+              var term_lnk_1 = get_lnk(MEM,term,1);
+              link(MEM, par1+0, lnk(DP1,get_ex0(term),0,let0));               // w:par1[0] w:let0[1]
+              link(MEM, par1+1, lnk(DP1,get_ex0(term),0,let1));               // w:par1[1] w:let1[1]
+              subst(MEM, term_lnk_1, lnk(PAR,get_ex0(expr),0,par1));          // r:let0[1] d:par1
+
+              var term_lnk_0 = get_lnk(MEM,term,0);
+              link(MEM, par0+0, lnk(DP0,get_ex0(term),0,let0));               // w:par0[0] w:let0[0]
+              link(MEM, par0+1, lnk(DP0,get_ex0(term),0,let1));               // w:par0[1] w:let1[0]
+              subst(MEM, term_lnk_0, lnk(PAR,get_ex0(expr),0,par0));          // r:let0[0] d:par0
+
               link(MEM, host, lnk(PAR, get_ex0(expr), 0, get_tag(term) === DP0 ? par0 : par1));
-              clear(MEM, get_loc(term,0), 3);
-              clear(MEM, get_loc(expr,0), 2);
-              //console.log(show_term(MEM, deref(MEM, 0)));
               return deref(MEM, host);
+
+              //var par0 = alloc(MEM, 2);
+              //var par1 = alloc(MEM, 2);
+              //var let0 = alloc(MEM, 3);
+              //var let1 = alloc(MEM, 3);
+              //link(MEM, par0+0, lnk(DP0,get_ex0(term),0,let0));
+              //link(MEM, par0+1, lnk(DP0,get_ex0(term),0,let1));
+              //link(MEM, par1+0, lnk(DP1,get_ex0(term),0,let0));
+              //link(MEM, par1+1, lnk(DP1,get_ex0(term),0,let1));
+              //link(MEM, let0+2, get_lnk(MEM,expr,0));
+              //link(MEM, let1+2, get_lnk(MEM,expr,1));
+              //subst(MEM, get_lnk(MEM,term,0), lnk(PAR,get_ex0(expr),0,par0));
+              //subst(MEM, get_lnk(MEM,term,1), lnk(PAR,get_ex0(expr),0,par1));
+              //link(MEM, host, lnk(PAR, get_ex0(expr), 0, get_tag(term) === DP0 ? par0 : par1));
+              //clear(MEM, get_loc(term,0), 3);
+              //clear(MEM, get_loc(expr,0), 2);
+              ////console.log(show_term(MEM, deref(MEM, 0)));
+              //return deref(MEM, host);
             }
           }
           // !A<x y> = $V:L{a b c ...}
@@ -356,24 +417,43 @@ export function reduce(MEM: Mem, host: Loc) : Lnk {
           // ~
           case CTR: {
             ++GAS;
-            //console.log("[let-ctr] " + get_loc(term,0) + " " + get_loc(expr,0));
             let func = get_ex0(expr);
             let arit = get_ex1(expr);
-            let ctr0 = alloc(MEM, arit);
-            let ctr1 = alloc(MEM, arit);
-            for (let i = 0; i < arit; ++i) {
-              let leti = alloc(MEM, 3);
-              link(MEM, ctr0+i, lnk(DP0, 0, 0, leti));
-              link(MEM, ctr1+i, lnk(DP1, 0, 0, leti));
-              link(MEM, leti+2, get_lnk(MEM,expr,i));
+            if (arit === 0) {
+              subst(MEM, get_lnk(MEM,term,0), lnk(CTR, func, 0, 0));
+              subst(MEM, get_lnk(MEM,term,1), lnk(CTR, func, 0, 0));
+              link(MEM, host, lnk(CTR, func, 0, 0));
+              clear(MEM, get_loc(term,0), 3);
+              return deref(MEM, host);
+            } else {
+              let ctr0 = get_loc(expr,0);
+              let ctr1 = alloc(MEM, arit);
+              subst(MEM, get_lnk(MEM,term,0), lnk(CTR, func, arit, ctr0));
+              subst(MEM, get_lnk(MEM,term,1), lnk(CTR, func, arit, ctr1));
+              for (let i = 0; i < arit; ++i) {
+                let leti = i === 0 ? get_loc(term,0) : alloc(MEM, 3);
+                var expr_lnk_i = get_lnk(MEM, expr, i);
+                link(MEM, ctr0+i, lnk(DP0, 0, 0, leti));
+                link(MEM, ctr1+i, lnk(DP1, 0, 0, leti));
+                link(MEM, leti+2, expr_lnk_i);
+              }
+              link(MEM, host, lnk(CTR, func, arit, get_tag(term) === DP0 ? ctr0 : ctr1));
+              return deref(MEM, host);
             }
-            subst(MEM, get_lnk(MEM,term,0), lnk(CTR, func, arit, ctr0));
-            subst(MEM, get_lnk(MEM,term,1), lnk(CTR, func, arit, ctr1));
-            link(MEM, host, lnk(CTR, func, arit, get_tag(term) === DP0 ? ctr0 : ctr1));
-            clear(MEM, get_loc(term,0), 3);
-            clear(MEM, get_loc(expr,0), arit);
-            //console.log(show_term(MEM, deref(MEM, 0)));
-            return deref(MEM, host);
+            //let ctr0 = alloc(MEM, arit);
+            //let ctr1 = alloc(MEM, arit);
+            //for (let i = 0; i < arit; ++i) {
+              //let leti = alloc(MEM, 3);
+              //link(MEM, ctr0+i, lnk(DP0, 0, 0, leti));
+              //link(MEM, ctr1+i, lnk(DP1, 0, 0, leti));
+              //link(MEM, leti+2, get_lnk(MEM,expr,i));
+            //}
+            //subst(MEM, get_lnk(MEM,term,0), lnk(CTR, func, arit, ctr0));
+            //subst(MEM, get_lnk(MEM,term,1), lnk(CTR, func, arit, ctr1));
+            //link(MEM, host, lnk(CTR, func, arit, get_tag(term) === DP0 ? ctr0 : ctr1));
+            //clear(MEM, get_loc(term,0), 3);
+            //clear(MEM, get_loc(expr,0), arit);
+            //return deref(MEM, host);
           }
         }
         break;
@@ -535,3 +615,8 @@ function normal_go(MEM: Mem, host: Loc, seen: MAP<boolean>) : Lnk {
     }
   }
 }
+
+//(window as any).PERMUT = [0,1,2,3,4,5,6,7,8];
+//export function SET_PERMUT(permut: any) {
+  //PERMUT = permut;
+//}
