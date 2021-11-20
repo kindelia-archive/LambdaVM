@@ -9,5 +9,5 @@ if (path) {
   var targ = Deno.args[1] || "ts";
   API.run(file, {target: targ});
 } else {
-  console.log("Usage: kindash file.kindash");
+  console.log("Usage: crush file.kindash");
 }
