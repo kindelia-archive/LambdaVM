@@ -166,6 +166,17 @@ export function show_file(file: File): string {
 // Parser
 // ------
 
+export function parse_let() : P.Parser<Term | null> {
+  return P.guard(P.match("let "), (state) => {
+    var [state, skp0] = P.match("let ")(state);
+    var [state, name] = P.name1(state);
+    var [state, skp1] = P.consume("=")(state);
+    var [state, expr] = parse_term()(state);
+    var [state, body] = parse_term()(state);
+    return [state, App(Lam(name,body),expr)];
+  });
+}
+
 export function parse_dup() : P.Parser<Term | null> {
   return P.guard(P.match("dup "), (state) => {
     var [state, skp0] = P.match("dup ")(state);
@@ -230,6 +241,7 @@ export function parse_var() : P.Parser<Term | null> {
 
 export function parse_term() : P.Parser<Term> {
   return P.grammar("Term", [
+    parse_let(),
     parse_dup(),
     parse_lam(),
     parse_app(),
@@ -237,7 +249,6 @@ export function parse_term() : P.Parser<Term> {
     parse_cal(),
     parse_var(),
     (state) => {
-      throw new Error("???");
       return [state, null];
     }
   ]);

@@ -282,7 +282,6 @@ export function highlight(from_index: number, to_index: number, code: string): s
   for (var i = 0; i < lines.length; ++i) {
     var numb = block_from_line + i;
     var line = lines[i] + "\n";
-    console.log(numb, from_line, to_line);
     if (numb === from_line && numb === to_line) {
       line = line.slice(0,line.indexOf(open)) + open_color + line.slice(line.indexOf(open), line.indexOf(close)+1) + close_color + line.slice(line.indexOf(close)+1);
     } else if (numb === from_line) {
