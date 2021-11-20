@@ -1,5 +1,3 @@
-#!/usr/bin/env -S deno --unstable run --allow-all
-
 import * as API from "./API.ts"
 
 var path = Deno.args[0];
