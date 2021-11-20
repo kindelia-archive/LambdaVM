@@ -1,0 +1,19 @@
+con 0 false{}
+con 1 true{}
+con 0 zero{}
+con 1 succ{pred}
+
+fun not(x):
+  case x {
+    false{}: true{}
+    true{}: false{}
+  }
+
+fun double(x):
+  case x {
+    zero{}: zero{}
+    succ{pred}: succ{succ{double(pred)}}
+  }
+
+fun main():
+  double(succ{succ{succ{zero{}}}})

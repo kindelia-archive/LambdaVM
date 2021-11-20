@@ -1,9 +1,3 @@
-// The Optimal Calculus
-// ====================
-
-import {pad} from "./utils.ts"
-import {show_tag, show_lnk, show_mem, show_term} from "./syntax.ts";
-
 export type MAP<T> = Record<string, T>;
 
 export const NIL : number = 0
@@ -214,9 +208,6 @@ export function subst(MEM: Mem, lnk: Lnk, val: Lnk) {
 
 export function reduce(MEM: Mem, host: Loc) : Lnk {
   while (true) {
-
-    // TODO: remove
-    //if (GAS > 350) { throw new Error("deu ruim"); }
 
     var term = deref(MEM, host);
     switch (get_tag(term)) {
@@ -443,105 +434,12 @@ export function reduce(MEM: Mem, host: Loc) : Lnk {
         break;
       }
       case CAL: {
-        //console.log(show_term(MEM[0]));
         switch (get_ex0(term))
-
         // START GENERATED CODE
         {
-
-          case 0: {
-            var loc$0 = get_loc(term, 0);
-            var arg$1 = get_lnk(MEM, term, 0);
-            var loc$0$ = reduce(MEM, loc$0);
-            switch (get_tag(loc$0$) == CTR ? get_ex0(loc$0$) : -1) {
-              case 0: {
-                ++GAS;
-                var ctr$2 = alloc(MEM, 0);
-                link(MEM, host, lnk(CTR, 0, 0, ctr$2));
-                clear(MEM, get_loc(loc$0$, 0), 0);
-                clear(MEM, get_loc(term, 0), 1);
-                continue;
-              }
-              case 1: {
-                var fld_loc$3 = get_loc(loc$0$, 0);
-                var fld_arg$4 = get_lnk(MEM, loc$0$, 0);
-                ++GAS;
-                var dup$5 = alloc(MEM, 3);
-                link(MEM, dup$5+2, fld_arg$4);
-                var cal$6 = alloc(MEM, 1);
-                link(MEM, cal$6+0, lnk(DP0, 127, 0, dup$5));
-                var cal$7 = alloc(MEM, 1);
-                link(MEM, cal$7+0, lnk(DP1, 127, 0, dup$5));
-                var cal$8 = alloc(MEM, 2);
-                link(MEM, cal$8+0, lnk(CAL, 0, 1, cal$6));
-                link(MEM, cal$8+1, lnk(CAL, 0, 1, cal$7));
-                link(MEM, host, lnk(CAL, 1, 2, cal$8));
-                clear(MEM, get_loc(loc$0$, 0), 1);
-                clear(MEM, get_loc(term, 0), 1);
-                continue;
-              }
-            }
-          }
-
-          case 1: {
-            var loc$0 = get_loc(term, 0);
-            var arg$1 = get_lnk(MEM, term, 0);
-            var loc$2 = get_loc(term, 1);
-            var arg$3 = get_lnk(MEM, term, 1);
-            var loc$0$ = reduce(MEM, loc$0);
-            switch (get_tag(loc$0$) == CTR ? get_ex0(loc$0$) : -1) {
-              case 0: {
-                var loc$2$ = reduce(MEM, loc$2);
-                switch (get_tag(loc$2$) == CTR ? get_ex0(loc$2$) : -1) {
-                  case 0: {
-                    ++GAS;
-                    var ctr$4 = alloc(MEM, 0);
-                    link(MEM, host, lnk(CTR, 1, 0, ctr$4));
-                    clear(MEM, get_loc(loc$2$, 0), 0);
-                    clear(MEM, get_loc(loc$0$, 0), 0);
-                    clear(MEM, get_loc(term, 0), 2);
-                    continue;
-                  }
-                  case 1: {
-                    ++GAS;
-                    var ctr$5 = alloc(MEM, 0);
-                    link(MEM, host, lnk(CTR, 1, 0, ctr$5));
-                    clear(MEM, get_loc(loc$2$, 0), 0);
-                    clear(MEM, get_loc(loc$0$, 0), 0);
-                    clear(MEM, get_loc(term, 0), 2);
-                    continue;
-                  }
-                }
-              }
-              case 1: {
-                var loc$2$ = reduce(MEM, loc$2);
-                switch (get_tag(loc$2$) == CTR ? get_ex0(loc$2$) : -1) {
-                  case 0: {
-                    ++GAS;
-                    var ctr$6 = alloc(MEM, 0);
-                    link(MEM, host, lnk(CTR, 1, 0, ctr$6));
-                    clear(MEM, get_loc(loc$2$, 0), 0);
-                    clear(MEM, get_loc(loc$0$, 0), 0);
-                    clear(MEM, get_loc(term, 0), 2);
-                    continue;
-                  }
-                  case 1: {
-                    ++GAS;
-                    var ctr$7 = alloc(MEM, 0);
-                    link(MEM, host, lnk(CTR, 0, 0, ctr$7));
-                    clear(MEM, get_loc(loc$2$, 0), 0);
-                    clear(MEM, get_loc(loc$0$, 0), 0);
-                    clear(MEM, get_loc(term, 0), 2);
-                    continue;
-                  }
-                }
-              }
-            }
-          }
-
+//GENERATED_CODE//
         }
         // END GENERATED CODE
-        
       }
       break;
     }
@@ -599,8 +497,3 @@ function normal_go(MEM: Mem, host: Loc, seen: MAP<boolean>) : Lnk {
     }
   }
 }
-
-//(window as any).PERMUT = [0,1,2,3,4,5,6,7,8];
-//export function SET_PERMUT(permut: any) {
-  //PERMUT = permut;
-//}
