@@ -12,8 +12,9 @@ fun not(x):
 fun double(x):
   case x {
     zero{}: zero{}
-    succ{pred}: succ{succ{double(pred)}}
+    //succ{pred}: succ{succ{succ{double(pred)}}}
+    succ{pred}: double(pred)
   }
 
 fun main():
-  double(succ{succ{succ{zero{}}}})
+  double(succ{succ{zero{}}})

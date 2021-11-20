@@ -83,7 +83,7 @@ export async function run(code: string, opts: any) {
   }
 
   if (opts.target === "ts") {
-    build_runtime(file, "ts");
+    await build_runtime(file, "ts");
     var Runtime = await import((new URL("./../bin/Runtime.ts", import.meta.url)).pathname);
     normal = Runtime.normal;
   }
