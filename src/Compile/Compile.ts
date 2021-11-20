@@ -150,7 +150,6 @@ export function compile_function(func: K.Function, table: {[name:string]:number}
   function compile_term(term: K.Term, tab: number) : string {
     switch (term.ctor) {
       case "Var":
-        //console.log("->", term.name, args);
         return args[term.name] ? args[term.name] : "?";
       case "Dup":
         var name = fresh("dup");
@@ -166,6 +165,7 @@ export function compile_function(func: K.Function, table: {[name:string]:number}
         text += line(tab, VAR + " " + name + " = alloc(MEM, 2);");
         args[term.name] = "lnk(VAR, 0, 0, "+name+")";
         var body = compile_term(term.body, tab);
+        text += line(tab, "link(MEM, " + name+"+1, " + body + ");");
         return "lnk(LAM, 0, 0, " + name + ")";
       case "App":
         var name = fresh("app");
@@ -173,6 +173,7 @@ export function compile_function(func: K.Function, table: {[name:string]:number}
         var argm = compile_term(term.argm, tab);
         text += line(tab, VAR + " " + name + " = alloc(MEM, 2);");
         text += line(tab, "link(MEM, " + name+"+0, " + func + ");");
+        text += line(tab, "link(MEM, " + name+"+1, " + argm + ");");
         return "lnk(APP, 0, 0, " + name + ")";
       case "Ctr":
         var ctr_args : Array<string> = [];
