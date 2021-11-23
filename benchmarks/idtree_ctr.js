@@ -15,6 +15,9 @@ function slow(x) {
 function main() {
   return [
     slow(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(Z())))))))))))))))))))))))))))(0),
+    slow(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(Z())))))))))))))))))))))))))))(0),
+    slow(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(Z())))))))))))))))))))))))))))(0),
+    slow(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(Z())))))))))))))))))))))))))))(0),
   ]
 };
 

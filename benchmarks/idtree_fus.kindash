@@ -1,28 +1,34 @@
 fun main():
-  let S = λn λz λs (s n)
-  let Z = λz λs z
   let Y = λf ((λr (r r)) λr (f (r r)))
+
+  let SUCC = λn λz λs (s n)
+  let ZERO = λz λs z
+
+  let TRUE = λt λf t
+  let FALSE = λt λf f
+
+  let AND = λa λb (a b λt λf t)
+
   let slow = (Y λslow λn
     // case n
     (n 
       // zero:
-      (λx x)
+      TRUE
       // succ:
       (λpred
-        let rec = λx (slow pred)
-        ((rec (λx x)) (rec (λx x))))))
+        let rec = λx (x (slow pred))
+        (AND (rec (λx x)) (rec (λx x))))))
+
   (slow
-    (S (S (S (S
-    (S (S (S (S
-    (S (S (S (S
-    (S (S (S (S
-    (S (S (S (S
-    (S (S (S (S
-    Z
-    ))))
-    ))))
-    ))))
-    ))))
-    ))))
-    ))))
+    (SUCC (SUCC (SUCC (SUCC (SUCC (SUCC (SUCC (SUCC
+    (SUCC (SUCC (SUCC (SUCC (SUCC (SUCC (SUCC (SUCC
+    (SUCC (SUCC (SUCC (SUCC (SUCC (SUCC (SUCC (SUCC
+    (SUCC (SUCC (SUCC (SUCC (SUCC (SUCC (SUCC (SUCC
+    (SUCC (SUCC (SUCC (SUCC (SUCC (SUCC (SUCC (SUCC
+    ZERO
+    ))))))))
+    ))))))))
+    ))))))))
+    ))))))))
+    ))))))))
   )
