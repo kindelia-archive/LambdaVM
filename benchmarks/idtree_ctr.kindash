@@ -1,0 +1,18 @@
+con 0 T{}
+con 0 Z{}
+con 1 S{pred}
+
+fun slow(x):
+  case x {
+    Z{}:
+      λx x
+    S{pred}:
+      dup pred_a pred_b = pred
+      (slow(pred_a) slow(pred_b))
+  }
+
+
+fun main():
+  T{
+    slow(S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{Z{}}}}}}}}}}}}}}}}}}}}}}}}}}})
+  }

@@ -96,7 +96,7 @@ export function compile_function(func: K.Function, table: {[name:string]:number}
     var GAS = "++GAS";
   } else if (target === "c") {
     var VAR = "u64";
-    var GAS = "+GAS";
+    var GAS = "inc_gas(MEM)";
   } else {
     throw "Unknown target: " + target;
   }
@@ -135,7 +135,7 @@ export function compile_function(func: K.Function, table: {[name:string]:number}
         break;
       case "Ret":
         if (GAS) {
-          text += line(tab, "++GAS;");
+          text += line(tab, GAS+";");
         }
         var done = compile_term(match.expr, tab);
         text += line(tab, "link(MEM, host, " + done + ");"); 

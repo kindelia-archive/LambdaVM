@@ -15,7 +15,11 @@ function dylib_suffix() {
 
 async function build_runtime(file: Kindash.File, target: string) {
   var comp = Compile.compile(file, target);
-  var srcp = new URL("./Crusher/Runtime."+target, import.meta.url);
+  if (target === "c") {
+    var srcp = new URL("./Crusher/Runtime."+target, import.meta.url);
+  } else {
+    var srcp = new URL("./Crusher/Runtime."+target, import.meta.url);
+  }
   var trgp = new URL("./../bin/Runtime."+target, import.meta.url);
   var code = (await Deno.readTextFile(srcp)).replace("//GENERATED_CODE//", comp);
   await Deno.writeTextFileSync(trgp, code);
@@ -38,6 +42,10 @@ function load_c_dylib() {
       ],
       result: "u32",
     },
+    "get_gas": {
+      parameters: [],
+      result: "u32"
+    },
   });
 }
 
@@ -48,7 +56,7 @@ function normal_clang(MEM: Crusher.Mem, host: Crusher.Loc): number {
     return new Uint8Array(arr.buffer);
   }
 
-  return dylib.symbols.normal_ffi(
+  MEM.lnk.size = dylib.symbols.normal_ffi(
     convert(MEM.lnk.data), MEM.lnk.size,
     convert(MEM.use[0].data), MEM.use[0].size,
     convert(MEM.use[1].data), MEM.use[2].size,
@@ -61,6 +69,8 @@ function normal_clang(MEM: Crusher.Mem, host: Crusher.Loc): number {
     convert(MEM.use[8].data), MEM.use[8].size,
     host
   ) as number;
+
+  return dylib.symbols.get_gas() as number;
 }
 
 export async function run(code: string, opts: any) {
@@ -88,7 +98,6 @@ export async function run(code: string, opts: any) {
     normal = Runtime.normal;
   }
 
-
   console.log("Term:\n=====\n" + Kindash.show_term(term) + "\n");
   console.log("Core:\n=====\n" + core + "\n");
 
@@ -97,6 +106,7 @@ export async function run(code: string, opts: any) {
     var gas = normal(mem, 0);
     console.log("Norm:\n=====\n" + Convert.crusher_to_kindash(mem) + "\n");
     console.log("Cost:\n=====\n- gas: " + gas + " \n- mem: " + mem.lnk.size);
+    //console.log(Crusher.show_mem(mem));
   } else {
     console.log("Couldn't load runtime.");
   }

@@ -26,6 +26,7 @@ export function show_tag(tag: K.Tag) {
     case K.NIL: return "NIL";
     case K.CTR: return "CTR";
     case K.CAL: return "CAL";
+    case K.FRE: return "FRE";
   }
 }
 

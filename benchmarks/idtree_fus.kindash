@@ -1,0 +1,28 @@
+fun main():
+  let S = λn λz λs (s n)
+  let Z = λz λs z
+  let Y = λf ((λr (r r)) λr (f (r r)))
+  let slow = (Y λslow λn
+    // case n
+    (n 
+      // zero:
+      (λx x)
+      // succ:
+      (λpred
+        let rec = λx (slow pred)
+        ((rec (λx x)) (rec (λx x))))))
+  (slow
+    (S (S (S (S
+    (S (S (S (S
+    (S (S (S (S
+    (S (S (S (S
+    (S (S (S (S
+    (S (S (S (S
+    Z
+    ))))
+    ))))
+    ))))
+    ))))
+    ))))
+    ))))
+  )

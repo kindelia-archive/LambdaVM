@@ -10,6 +10,7 @@ export const VAR : number = 6
 export const ARG : number = 7
 export const CTR : number = 8 // ex0 = function, ex1 = arity
 export const CAL : number = 9 // ex0 = function, ex1 = arity
+export const FRE : number = 0xFFFFFFFFFFFFF
 
 export type Tag = number // 4 bits
 export type Ex0 = number // 8 bits
@@ -103,15 +104,37 @@ export function get_gas() : number {
   return GAS;
 }
 
+// NO REUSE
+
+//export function alloc(MEM: Mem, size: number) : Loc {
+  //if (size === 0) {
+    //return 0;
+  //} else {
+    //var loc = MEM.lnk.size;
+    //console.log("alloc:", loc, MEM.lnk.size);
+    //for (var i = 0; i < size; ++i) {
+      //array_push(MEM.lnk, 0);
+    //}
+    //return loc;
+  //}
+//}
+//export function clear(MEM: Mem, loc: Loc, size: number) {
+  //// no memory freeing
+//}
+
+// REUSE (WITH FREELIST)
+
 export function alloc(MEM: Mem, size: number) : Loc {
   if (size === 0) {
     return 0;
   } else {
     var reuse = array_pop(MEM.use[size]);
     if (reuse !== null) {
+      //console.log("reuse index " + ("   " + reuse).slice(-3) + " (mem.size = " + MEM.lnk.size + ")");
       return reuse;
     } else {
       var loc = MEM.lnk.size;
+      //console.log("alloc index " + ("   " + loc).slice(-3) + " (mem.size = " + MEM.lnk.size + ")");
       for (var i = 0; i < size; ++i) {
         array_push(MEM.lnk, 0);
       }
@@ -119,12 +142,55 @@ export function alloc(MEM: Mem, size: number) : Loc {
     }
   }
 }
-
 export function clear(MEM: Mem, loc: Loc, size: number) {
   if (size > 0) {
+    // pushes to free list
     array_push(MEM.use[size], loc);
   }
 }
+
+// REUSE (WITH RANDOM TRY)
+
+//export function alloc(MEM: Mem, size: number) : Loc {
+  //if (size === 0) {
+    //return 0;
+  //} else {
+    //var loc = Math.floor(Math.random() * MEM.lnk.size);
+    //// We found a freed hole
+    //if (array_read(MEM.lnk, loc) === FRE) {
+      //// Finds hole start and length (up to the needed space)
+      //var len = 1;
+      //while (len < size && loc > 0 && array_read(MEM.lnk, loc - 1) === FRE) {
+        //loc--;
+        //len++;
+      //}
+      //while (len < size && loc + len < MEM.lnk.size && array_read(MEM.lnk, loc + len) === FRE) {
+        //len++;
+      //}
+      //// If the hole has enough space, fill it and return
+      //if (len === size) {
+        //for (var i = loc; i < loc + size; ++i) {
+          //array_write(MEM.lnk, i, 0);
+        //}
+        //return loc;
+      //}
+      //// Otherwise, give up and alloc extra space
+    //}
+    //var loc = MEM.lnk.size;
+    //for (var i = 0; i < size; ++i) {
+      //array_push(MEM.lnk, 0);
+    //}
+    //return loc;
+  //}
+//}
+//export function clear(MEM: Mem, loc: Loc, size: number) {
+  //// marks position as freed
+  //for (var i = 0; i < size; ++i) {
+    //array_write(MEM.lnk, loc + i, FRE);
+  //}
+//}
+
+// ~~~
 
 export function init(capacity: number = 2048 * array_megabyte) {
   var MEM = {

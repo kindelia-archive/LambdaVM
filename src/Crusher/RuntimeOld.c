@@ -1,6 +1,5 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include <pthread.h>
 
 // Types
 // -----
@@ -33,43 +32,31 @@ typedef struct {
   u64* data;
 } Arr;
 
-
 typedef struct {
-  Arr* lnk;
-  u64 gas;
+  Arr lnk;
   Arr use[9];
 } Mem;
 
-typedef struct {
-  pthread_t thread;
-  Mem mem;
-  u64 host;
-} Worker;
-
-// Workers
-// -------
-
-const u64 MAX_WORKERS = 8;
-u64 CAN_SPAWN_WORKERS = 1;
-Worker workers[MAX_WORKERS];
-
-// Gas
-// ---
-
-u32 get_gas() {
-  u32 total = 0;
-  for (u64 t = 0; t < MAX_WORKERS; ++t) {
-    total += workers[t].mem.gas;
-  }
-  return total;
-}
+static u32 GAS = 0;
 
 void inc_gas(Mem* MEM) {
-  MEM->gas++;
+  ++GAS;
 }
+
+u32 get_gas() {
+  return GAS;
+}
+
 
 // Array
 // -----
+
+Arr array_alloc(u64 capacity) {
+  Arr arr;
+  arr.size = 0;
+  arr.data = malloc(capacity * sizeof(u64));
+  return arr;
+}
 
 void array_write(Arr* arr, u64 idx, u64 value) {
   arr->data[idx] = value;
@@ -115,19 +102,19 @@ Loc get_loc(Lnk lnk, u8 arg) {
 }
 
 Lnk get_lnk(Mem* mem, Lnk lnk, u8 arg) {
-  return array_read(mem->lnk, get_loc(lnk, arg));
+  return array_read(&mem->lnk, get_loc(lnk, arg));
 }
 
 Lnk deref(Mem* mem, Loc loc) {
-  return array_read(mem->lnk, loc);
+  return array_read(&mem->lnk, loc);
 }
 
 u64 link(Mem* mem, Loc loc, Lnk link) {
-  array_write(mem->lnk, loc, link);
+  array_write(&mem->lnk, loc, link);
   switch (get_tag(link)) {
-    case VAR: array_write(mem->lnk, get_loc(link,0), lnk(ARG,0,0,loc)); break;
-    case DP0: array_write(mem->lnk, get_loc(link,0), lnk(ARG,0,0,loc)); break;
-    case DP1: array_write(mem->lnk, get_loc(link,1), lnk(ARG,0,0,loc)); break;
+    case VAR: array_write(&mem->lnk, get_loc(link,0), lnk(ARG,0,0,loc)); break;
+    case DP0: array_write(&mem->lnk, get_loc(link,0), lnk(ARG,0,0,loc)); break;
+    case DP1: array_write(&mem->lnk, get_loc(link,1), lnk(ARG,0,0,loc)); break;
   }
   return link;
 }
@@ -140,9 +127,9 @@ Loc alloc(Mem* mem, u64 size) {
     if (reuse != -1) {
       return reuse;
     } else {
-      u64 loc = __atomic_fetch_add(&mem->lnk->size, size, __ATOMIC_RELAXED);
+      u64 loc = mem->lnk.size;
       for (u64 i = 0; i < size; ++i) {
-        mem->lnk->data[loc + i] = 0;
+        array_push(&mem->lnk, 0);
       }
       return loc;
     }
@@ -294,9 +281,8 @@ Lnk reduce(Mem* MEM, Loc host) {
             continue;
           }
           case PAR: {
-            inc_gas(MEM);
-
             if (get_ex0(term) == get_ex0(expr)) {
+              inc_gas(MEM);
               subst(MEM, get_lnk(MEM,term,0), get_lnk(MEM,expr,0));
               subst(MEM, get_lnk(MEM,term,1), get_lnk(MEM,expr,1));
               link(MEM, host, get_lnk(MEM, expr, get_tag(term) == DP0 ? 0 : 1));
@@ -304,6 +290,7 @@ Lnk reduce(Mem* MEM, Loc host) {
               clear(MEM, get_loc(expr,0), 2);
               continue;
             } else {
+              inc_gas(MEM);
 
               u64 par0 = alloc(MEM, 2);
               u64 let0 = get_loc(term,0);
@@ -378,10 +365,7 @@ u8 get_bit(u64* bits, u8 bit) {
     return (bits[bit >> 6] >> (bit & 0x3F)) & 1;
 }
 
-void normal_fork(u64 tid, Loc host);
-void normal_join(u64 tid);
-
-Lnk normal_cont(Mem* MEM, Loc host, u64* seen) {
+Lnk normal_go(Mem* MEM, Loc host, u64* seen) {
   Lnk term = deref(MEM, host);
   if (get_bit(seen, get_loc(term,0))) {
     return term;
@@ -390,51 +374,34 @@ Lnk normal_cont(Mem* MEM, Loc host, u64* seen) {
     set_bit(seen, get_loc(term,0));
     switch (get_tag(term)) {
       case LAM: {
-        link(MEM, get_loc(term,1), normal_cont(MEM, get_loc(term,1), seen));
+        link(MEM, get_loc(term,1), normal_go(MEM, get_loc(term,1), seen));
         return term;
       }
       case APP: {
-        link(MEM, get_loc(term,0), normal_cont(MEM, get_loc(term,0), seen));
-        link(MEM, get_loc(term,1), normal_cont(MEM, get_loc(term,1), seen));
+        link(MEM, get_loc(term,0), normal_go(MEM, get_loc(term,0), seen));
+        link(MEM, get_loc(term,1), normal_go(MEM, get_loc(term,1), seen));
         return term;
       }
       case PAR: {
-        link(MEM, get_loc(term,0), normal_cont(MEM, get_loc(term,0), seen));
-        link(MEM, get_loc(term,1), normal_cont(MEM, get_loc(term,1), seen));
+        link(MEM, get_loc(term,0), normal_go(MEM, get_loc(term,0), seen));
+        link(MEM, get_loc(term,1), normal_go(MEM, get_loc(term,1), seen));
         return term;
       }
       case DP0: {
-        link(MEM, get_loc(term,2), normal_cont(MEM, get_loc(term,2), seen));
+        link(MEM, get_loc(term,2), normal_go(MEM, get_loc(term,2), seen));
         return term;
       }
       case DP1: {
-        link(MEM, get_loc(term,2), normal_cont(MEM, get_loc(term,2), seen));
+        link(MEM, get_loc(term,2), normal_go(MEM, get_loc(term,2), seen));
         return term;
       }
-      case CAL: {
-        u64 arity = (u64)get_ex1(term);
-        for (u64 i = 0; i < arity; ++i) {
-          link(MEM, get_loc(term,i), normal_cont(MEM, get_loc(term,i), seen));
-        }
-        return term;
-      }
+      case CAL:
       case CTR: {
         u64 arity = (u64)get_ex1(term);
-        if (CAN_SPAWN_WORKERS && arity > 1 && arity <= MAX_WORKERS) {
-          CAN_SPAWN_WORKERS = 1;
-          for (u64 t = 0; t < arity; ++t) {
-            normal_fork(t, get_loc(term,t));
-          }
-          for (u64 t = 0; t < arity; ++t) {
-            normal_join(t);
-          }
-        } else {
-          for (u64 i = 0; i < arity; ++i) {
-            link(MEM, get_loc(term,i), normal_cont(MEM, get_loc(term,i), seen));
-          }
+        for (u64 i = 0; i < arity; ++i) {
+          link(MEM, get_loc(term,i), normal_go(MEM, get_loc(term,i), seen));
         }
         return term;
-
       }
       default: {
         return term;
@@ -449,23 +416,7 @@ Lnk normal(Mem* MEM, Loc host) {
   for (u64 i = 0; i < size; ++i) {
     seen[i] = 0;
   }
-  return normal_cont(MEM, host, seen);
-}
-
-void *normal_thread(void *args_ptr) {
-  u64 tid = (u64)args_ptr;
-  normal(&workers[tid].mem, workers[tid].host);
-  return 0;
-}
-
-void normal_fork(u64 tid, Loc host) {
-  printf("* spawning thread: %llu\n", tid);
-  workers[tid].host = host;
-  pthread_create(&workers[tid].thread, NULL, &normal_thread, (void*)tid);
-}
-
-void normal_join(u64 tid) {
-  pthread_join(workers[tid].thread, NULL);
+  return normal_go(MEM, host, seen);
 }
 
 u32 normal_ffi(
@@ -481,34 +432,30 @@ u32 normal_ffi(
   u8* use8_data, u32 use8_size,
   u32 host
 ) {
-  // Init thread objects
-  Arr* lnk = malloc(sizeof(Arr));
-  lnk->data = (u64*)lnk_data;
-  lnk->size = (u64)lnk_size;
-  for (u64 t = 0; t < MAX_WORKERS; ++t) {
-    workers[t].thread = NULL;
-    workers[t].mem.lnk = lnk;
-    workers[t].mem.gas = 0;
-    for (u64 i = 0; i < 8; ++i) {
-      workers[t].mem.use[i].data = malloc(256 * 131072 * sizeof(u64));
-      workers[t].mem.use[i].size = 0;
-    }
-  }
+  GAS = 0;
 
-  // Spawns the root worker
-  normal_fork(0, (u64) host);
-  normal_join(0);
-  printf("\n");
+  Mem mem;
+  mem.lnk.data = (u64*)lnk_data;
+  mem.lnk.size = (u64)lnk_size;
+  mem.use[0].data = (u64*)use0_data;
+  mem.use[0].size = (u64)use0_size;
+  mem.use[1].data = (u64*)use1_data;
+  mem.use[1].size = (u64)use1_size;
+  mem.use[2].data = (u64*)use2_data;
+  mem.use[2].size = (u64)use2_size;
+  mem.use[3].data = (u64*)use3_data;
+  mem.use[3].size = (u64)use3_size;
+  mem.use[4].data = (u64*)use4_data;
+  mem.use[4].size = (u64)use4_size;
+  mem.use[5].data = (u64*)use5_data;
+  mem.use[5].size = (u64)use5_size;
+  mem.use[6].data = (u64*)use6_data;
+  mem.use[6].size = (u64)use6_size;
+  mem.use[7].data = (u64*)use7_data;
+  mem.use[7].size = (u64)use7_size;
+  mem.use[8].data = (u64*)use8_data;
+  mem.use[8].size = (u64)use8_size;
+  normal(&mem, (u64)host);
 
-  // Clear thread objects
-  u32 size = (u32)lnk->size;
-  free(lnk);
-  for (u64 t = 0; t < MAX_WORKERS; ++t) {
-    for (u64 i = 0; i < 9; ++i) {
-      free(workers[t].mem.use[i].data);
-    }
-  }
-
-  return size;
-  //return GAS;
+  return mem.lnk.size;
 }
