@@ -1,34 +1,30 @@
+con 0 Z{}
+con 1 S{pred}
+
+fun slow(n):
+  case n {
+    Z{}:
+      λx x
+    S{pred}:
+      dup a b = λx (x slow(pred))
+      ((a λx x) (b λx x))
+  }
+
 fun main():
-  let Y = λf ((λr (r r)) λr (f (r r)))
-
-  let SUCC = λn λz λs (s n)
-  let ZERO = λz λs z
-
-  let TRUE = λt λf t
-  let FALSE = λt λf f
-
-  let AND = λa λb (a b λt λf t)
-
-  let slow = (Y λslow λn
-    // case n
-    (n 
-      // zero:
-      TRUE
-      // succ:
-      (λpred
-        let rec = λx (x (slow pred))
-        (AND (rec (λx x)) (rec (λx x))))))
-
-  (slow
-    (SUCC (SUCC (SUCC (SUCC (SUCC (SUCC (SUCC (SUCC
-    (SUCC (SUCC (SUCC (SUCC (SUCC (SUCC (SUCC (SUCC
-    (SUCC (SUCC (SUCC (SUCC (SUCC (SUCC (SUCC (SUCC
-    (SUCC (SUCC (SUCC (SUCC (SUCC (SUCC (SUCC (SUCC
-    (SUCC (SUCC (SUCC (SUCC (SUCC (SUCC (SUCC (SUCC
-    ZERO
-    ))))))))
-    ))))))))
-    ))))))))
-    ))))))))
-    ))))))))
+  slow(
+    S{S{S{S{
+    S{S{S{S{
+    S{S{S{S{
+    S{S{S{S{
+    S{S{S{S{
+    S{S{S{S{
+    S{S{S{S{
+    Z{}
+    }}}}
+    }}}}
+    }}}}
+    }}}}
+    }}}}
+    }}}}
+    }}}}
   )
