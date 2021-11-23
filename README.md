@@ -9,7 +9,7 @@ An optimal functional runtime.
 2. Paste this command to install `CaseCrusher`:
 
 ```bash
-https://raw.githubusercontent.com/taelin-org/CaseCrusher/master/src/CLI.ts
+deno --unstable install -n crush --allow-all https://raw.githubusercontent.com/taelin-org/CaseCrusher/master/src/CLI.ts
 ```
 
 3. Create a Kindash file:
