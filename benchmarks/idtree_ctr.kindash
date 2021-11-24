@@ -1,17 +1,21 @@
-con 0 Z{}
-con 1 S{pred}
-con 0 tuple{a b c d}
+type Tup { T{a b c d} }
+type Nat { Z{} S{pred} }
 
-fun slow(x):
+
+bond slow(x) {
   case x {
-    Z{}: λx x
-    S{pred}: (slow(pred) slow(pred))
+    Z{}:
+      λx x
+    S{pred}:
+      (slow(pred) slow(pred))
   }
+}
 
-fun main():
-  tuple{
+bond main() {
+  T{
     slow(S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{Z{}}}}}}}}}}}}}}}}}}}}}}}}}}})
     slow(S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{Z{}}}}}}}}}}}}}}}}}}}}}}}}}}})
     slow(S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{Z{}}}}}}}}}}}}}}}}}}}}}}}}}}})
     slow(S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{Z{}}}}}}}}}}}}}}}}}}}}}}}}}}})
   }
+}

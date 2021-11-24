@@ -1,7 +1,6 @@
-con 0 Z{}
-con 1 S{pred}
+type Nat { Z{} S{pred} }
 
-fun slow(n):
+bond slow(n) {
   case n {
     Z{}:
       λx x
@@ -9,8 +8,9 @@ fun slow(n):
       let rec = λx (x slow(pred))
       ((rec λx x) (rec λx x))
   }
+}
 
-fun main():
+bond main() {
   slow(
     S{S{S{S{
     S{S{S{S{
@@ -28,3 +28,4 @@ fun main():
     }}}}
     }}}}
   )
+}

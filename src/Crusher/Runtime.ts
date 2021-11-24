@@ -264,7 +264,6 @@ export function collect(MEM: Mem, term: Lnk) {
 // ---------
 
 export function subst(MEM: Mem, lnk: Lnk, val: Lnk) {
-  //console.log("subst", show_tag(get_tag(lnk)), show_tag(get_tag(val)));
   if (get_tag(lnk) !== NIL) {
     link(MEM, get_loc(lnk,0), val);
   } else {
@@ -276,6 +275,7 @@ export function reduce(MEM: Mem, host: Loc) : Lnk {
   while (true) {
 
     var term = deref(MEM, host);
+
     switch (get_tag(term)) {
       case APP: {
         let func = reduce(MEM, get_loc(term,0));
@@ -500,6 +500,7 @@ export function reduce(MEM: Mem, host: Loc) : Lnk {
         break;
       }
       case CAL: {
+        //console.log("call", get_ex0(term));
         switch (get_ex0(term))
         // START GENERATED CODE
         {

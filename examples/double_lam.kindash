@@ -1,7 +1,0 @@
-// Doubles a number using λ-Encodings (Scott)
-fun main(): 
-  let Y = λf (λr (f (r r)) λr (f (r r)))
-  let Z = λz λs z
-  let S = λn λz λs (s n)
-  let D = (Y λdouble λn (n Z λpred(S (S (double pred)))))
-  (D (S (S (S Z))))

@@ -75,9 +75,15 @@ export async function run(code: string, opts: any) {
   // --------------------------
   
   var file = Kindash.read(Kindash.parse_file, code);
-  var main = file.funs[file.funs.length - 1];
-  if (main.name !== "main" || main.body.ctor !== "Ret") {
+  //console.log(Kindash.show_file(file));
+  var main = file.defs[file.defs.length - 1];
+  if (!(main && main.$ === "NewBond" && main.bond.name === "main" && main.bond.body.$ === "Body")) {
     throw "Main not found.";
+  }
+  var name_table = Compile.gen_name_table(file);
+  var numb_table : {[numb:string]:string} = {};
+  for (var name in name_table) {
+    numb_table[String(name_table[name])] = name;
   }
 
   // Builds normalizer function
@@ -104,7 +110,7 @@ export async function run(code: string, opts: any) {
     var mem = Crusher.read_term(code);
   } else {
     var mem = Crusher.init();
-    Crusher.link(mem, 0, Crusher.lnk(Crusher.CAL, file.funs.length - 1, 0, 0));
+    Crusher.link(mem, 0, Crusher.lnk(Crusher.CAL, name_table["main"] || 0, 0, 0));
   }
 
   // Evaluates main()
@@ -112,39 +118,11 @@ export async function run(code: string, opts: any) {
 
   if (normal !== null) {
     var gas = normal(mem, 0);
-    console.log("Norm:\n=====");
-    console.log(Convert.crusher_to_kindash(mem) + "\n");
-    console.log("Cost:\n=====");
-    console.log("- gas: " + gas);
-    console.log("- mem: " + mem.lnk.size);
+    console.log(Convert.crusher_to_kindash(mem, Crusher.deref(mem,0), numb_table));
+    console.log("");
+    console.log("* gas: " + gas);
+    console.log("* mem: " + mem.lnk.size);
   } else {
     console.log("Couldn't load runtime.");
   }
 }
-
-//var code = `
-//con 0 false{}
-//con 1 true{}
-//con 0 zero{}
-//con 1 succ{pred}
-
-//fun not(x):
-  //case x {
-    //false{}: true{}
-    //true{}: false{}
-  //}
-
-//fun double(x):
-  //case x {
-    //zero{}: zero{}
-    //succ{pred}: succ{succ{double(pred)}}
-  //}
-
-//fun main():
-  //double(succ{succ{succ{zero{}}}})
-//`
-
-//run(code, {target: "ts"});
-////console.log(Kindash.show_file(Kindash.read(Kindash.parse_file, code)));
-
-

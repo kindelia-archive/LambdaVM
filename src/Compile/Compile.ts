@@ -10,7 +10,7 @@ function line(tab: number, text: string) {
   return text + "\n";
 }
 
-export function sanitize(func: K.Function): K.Function {
+export function sanitize(func: K.Bond): K.Bond {
   var size = 0;
   var uses : {[key:string]: number} = {};
   function fresh() : string {
@@ -40,23 +40,23 @@ export function sanitize(func: K.Function): K.Function {
     }
   }
 
-  function sanitize_func(func: K.Function): K.Function {
-    var name = func.name;
+  function sanitize_bond(bond: K.Bond): K.Bond {
+    var name = bond.name;
     var table : {[key:string]:string} = {};
-    for (var arg_name of func.args) {
+    for (var arg_name of bond.args) {
       table[arg_name] = fresh();
     }
-    var args = func.args.map(x => table[x] || x);
-    var body = sanitize_match(func.body, table, args);
-    return K.Fun(name, args, body);
+    var args = bond.args.map(x => table[x] || x);
+    var body = sanitize_match(bond.body, table, args);
+    return K.Bond(name, args, body);
   }
 
   function sanitize_match(match: K.Match, table: {[key:string]:string}, must_copy: string[]): K.Match {
-    switch (match.ctor) {
-      case "Mat": {
+    switch (match.$) {
+      case "Case": {
         let expr = table[match.expr] || match.expr;
-        let cses : Array<K.Case> = match.cses.map((cse) => {
-          let func : string = cse.func;
+        let cses : Array<{name: string, args: Array<string>, body: K.Match}> = match.cses.map((cse) => {
+          let name : string = cse.name;
           let args : Array<string> = cse.args;
           let body : K.Match = cse.body;
           let new_table = {...table};
@@ -65,22 +65,22 @@ export function sanitize(func: K.Function): K.Function {
           }
           let new_args = args.map(x => new_table[x] || x);
           let new_body = sanitize_match(body, new_table, must_copy.concat(new_args));
-          return K.Cse(func, new_args, new_body);
+          return {name, args: new_args, body: new_body};
         })
-        return K.Mat(expr, cses);
+        return K.Case(expr, cses);
       }
-      case "Ret": {
+      case "Body": {
         let expr = sanitize_term(match.expr, table); 
         for (var arg of must_copy) {
           expr = duplicator(arg, K.Var(arg), expr);
         }
-        return K.Ret(expr);
+        return K.Body(expr);
       }
     }
   }
 
   function sanitize_term(term: K.Term, table: {[key:string]:string}): K.Term {
-    switch (term.ctor) {
+    switch (term.$) {
       case "Var": {
         if (table[term.name]) {
           var used = uses[table[term.name]] || 0;
@@ -117,9 +117,9 @@ export function sanitize(func: K.Function): K.Function {
         return K.App(func, argm);
       }
       case "Ctr": {
-        let func = term.func;
+        let name = term.name;
         let args = term.args.map(x => sanitize_term(x,table));
-        return K.Ctr(func, args);
+        return K.Ctr(name, args);
       }
       case "Cal": {
         let func = term.func;
@@ -129,10 +129,10 @@ export function sanitize(func: K.Function): K.Function {
     }
   }
 
-  return sanitize_func(func);
+  return sanitize_bond(func);
 }
 
-export function compile_function(func: K.Function, table: {[name:string]:number}, target: string, tab: number): string {
+export function compile_bond(func: K.Bond, table: {[name:string]:number}, target: string, tab: number): string {
   if (target === "ts") {
     var VAR = "var"; 
     var GAS = "++GAS";
@@ -143,27 +143,27 @@ export function compile_function(func: K.Function, table: {[name:string]:number}
     throw "Unknown target: " + target;
   }
   
-  function compile_function(func: K.Function, tab: number) {
-    text += line(tab, "case " + table[func.name] + ": {");
-    for (var i = 0; i < func.args.length; ++i) {
-      locs[func.args[i]] = define("loc", "get_loc(term, "+i+")", tab+1);
-      args[func.args[i]] = define("arg", "get_lnk(MEM, term, "+i+")", tab+1);
+  function compile_bond(bond: K.Bond, tab: number) {
+    text += line(tab, "case " + table[bond.name] + ": {");
+    for (var i = 0; i < bond.args.length; ++i) {
+      locs[bond.args[i]] = define("loc", "get_loc(term, "+i+")", tab+1);
+      args[bond.args[i]] = define("arg", "get_lnk(MEM, term, "+i+")", tab+1);
     }
-    var clear = ["clear(MEM, get_loc(term, 0), "+func.args.length+")"];
-    compile_match(func.body, clear, tab + 1)
+    var clear = ["clear(MEM, get_loc(term, 0), "+bond.args.length+")"];
+    compile_match(bond.body, clear, tab + 1)
     //text += line(tab+1, "break;");
     text += line(tab, "}");
   }
 
   function compile_match(match: K.Match, clear: Array<string>, tab: number) {
-    switch (match.ctor) {
-      case "Mat":
+    switch (match.$) {
+      case "Case":
         var expr_name = locs[match.expr] || "";
         text += line(tab, VAR+" " + expr_name + "$ = reduce(MEM, " + expr_name + ");");
         text += line(tab, "switch (get_tag("+expr_name+"$) == CTR ? get_ex0(" + expr_name + "$) : -1) {");
         for (var i = 0; i < match.cses.length; ++i) {
-          text += line(tab+1, "case " + i + ": {");
           var cse = match.cses[i];
+          text += line(tab+1, "case " + (table[cse.name]||0) + ": {");
           for (var j = 0; j < cse.args.length; ++j) {
             locs[cse.args[j]] = define("fld_loc", "get_loc("+expr_name+"$, "+j+")", tab + 2);
             args[cse.args[j]] = define("fld_arg", "get_lnk(MEM, "+expr_name+"$, "+j+")", tab + 2);
@@ -174,7 +174,7 @@ export function compile_function(func: K.Function, table: {[name:string]:number}
         }
         text += line(tab, "}");
         break;
-      case "Ret":
+      case "Body":
         if (GAS) {
           text += line(tab, GAS+";");
         }
@@ -189,7 +189,7 @@ export function compile_function(func: K.Function, table: {[name:string]:number}
   }
 
   function compile_term(term: K.Term, tab: number) : string {
-    switch (term.ctor) {
+    switch (term.$) {
       case "Var":
         return args[term.name] ? args[term.name] : "?";
       case "Dup":
@@ -232,7 +232,7 @@ export function compile_function(func: K.Function, table: {[name:string]:number}
         for (var i = 0; i < ctr_args.length; ++i) {
           text += line(tab, "link(MEM, " + name+"+"+i + ", " + ctr_args[i] + ");");
         }
-        return "lnk(CTR, " + table[term.func] + ", " + ctr_args.length + ", " + name + ")";
+        return "lnk(CTR, " + (table[term.name]||0) + ", " + ctr_args.length + ", " + name + ")";
       case "Cal":
         var cal_args : Array<string> = [];
         for (var i = 0; i < term.args.length; ++i) {
@@ -244,7 +244,7 @@ export function compile_function(func: K.Function, table: {[name:string]:number}
         for (var i = 0; i < cal_args.length; ++i) {
           text += line(tab, "link(MEM, " + name+"+"+i + ", " + cal_args[i] + ");");
         }
-        return "lnk(CAL, " + table[term.func] + ", " + cal_args.length + ", " + name + ")";
+        return "lnk(CAL, " + (table[term.func]||0) + ", " + cal_args.length + ", " + name + ")";
     }
   }
 
@@ -265,27 +265,39 @@ export function compile_function(func: K.Function, table: {[name:string]:number}
   var text = "";
   var size = 0;
   //compile_func(func, tab);
-  compile_function(sanitize(func), tab);
+  compile_bond(sanitize(func), tab);
   return text;
 }
 
 export function gen_name_table(file: K.File) : {[name: string]: number} {
   var table : {[name: string]: number} = {};
-  for (var i = 0; i < file.cons.length; ++i) {
-    table[file.cons[i].name] = file.cons[i].numb;
-  }
-  for (var i = 0; i < file.funs.length; ++i) {
-    table[file.funs[i].name] = i;
+  var fresh = 0;
+  for (var i = 0; i < file.defs.length; ++i) {
+    var def = file.defs[i];
+    switch (def.$) {
+      case "NewBond":
+        table[def.bond.name] = ++fresh;
+        break;
+      case "NewType":
+        for (var ctr of def.type.ctrs) {
+          table[ctr.name] = ++fresh;
+        }
+        break;
+    }
   }
   return table;
 }
 
 export function compile(file: K.File, target: string) {
-  var table : {[name: string]: number} = gen_name_table(file);
+  var table = gen_name_table(file);
 
   var code = "";
-  for (var fun of file.funs) {
-    code += compile_function(fun, table, target, 5);
+  for (var def of file.defs) {
+    switch (def.$) {
+      case "NewBond":
+        code += compile_bond(def.bond, table, target, 5);
+        break;
+    }
   }
 
   return code;

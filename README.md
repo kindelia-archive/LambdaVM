@@ -1,6 +1,6 @@
-# CaseCrusher
+# Kindash
 
-An optimal functional runtime.
+A next-gen Optimal Functional Runtime.
 
 ## Installing
 

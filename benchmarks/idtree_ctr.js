@@ -7,8 +7,7 @@ function slow(x) {
     case "Z":
       return x => x;
     case "S":
-      var pred = x.pred
-      return (slow(pred))(slow(pred));
+      return (slow(x.pred))(slow(x.pred));
   }
 }
 

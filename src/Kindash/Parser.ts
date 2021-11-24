@@ -257,7 +257,7 @@ export function expected_string<A>(str: string): Parser<A> {
 
 export function expected_type<A>(name: string): Parser<A> {
   return (state) => {
-    throw "Expected '" + name + "':\n" + highlight(state.index, state.index + 1, state.code);
+    throw "Expected " + name + ":\n" + highlight(state.index, state.index + 1, state.code);
   }
 }
 

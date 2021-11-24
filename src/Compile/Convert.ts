@@ -99,7 +99,7 @@ export function kindash_to_crusher(term: K.Term, table: {[name:string]:number}):
   return text;
 }
 
-export function crusher_to_kindash(MEM: C.Mem, input_term: C.Lnk | null = null) : string {
+export function crusher_to_kindash(MEM: C.Mem, input_term: C.Lnk | null = null, table: {[idx:string]:string}) : string {
   var term : C.Lnk = input_term ? input_term : C.deref(MEM, 0);
   var names : C.MAP<string> = {};
   var count : number = 0;
@@ -196,7 +196,8 @@ export function crusher_to_kindash(MEM: C.Mem, input_term: C.Lnk | null = null) 
           for (let i = 0; i < arit; ++i) {
             args.push(go(C.get_lnk(MEM, term, i), stacks, seen, depth + 1));
           }
-          return "$" + String(func) + "{" + args.join(" ") + "}";
+          var name = table[func] || ("$" + String(func));
+          return name+ "{" + args.join(" ") + "}";
         }
         case C.CAL: {
           let func = C.get_ex0(term);
@@ -205,7 +206,8 @@ export function crusher_to_kindash(MEM: C.Mem, input_term: C.Lnk | null = null) 
           for (let i = 0; i < arit; ++i) {
             args.push(go(C.get_lnk(MEM, term, i), stacks, seen, depth + 1));
           }
-          return "@" + String(func) + "(" + args.join(" ") + ")";
+          var name = table[func] || ("@" + String(func));
+          return name + "(" + args.join(" ") + ")";
         }
         case C.VAR: {
           return names[term] || "^"+String(C.get_loc(term,0)) + "<" + C.show_lnk(C.deref(MEM, C.get_loc(term,0))) + ">";

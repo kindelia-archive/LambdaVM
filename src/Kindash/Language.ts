@@ -2,100 +2,125 @@ import * as P from "./Parser.ts";
 export * from "./Parser.ts"
 
 // Types
-// -----
+// =====
+
+// Term
+// ----
 
 export type Term
-  = {ctor: "Var", name: string}
-  | {ctor: "Dup", nam0: string, nam1: string, expr: Term, body: Term}
-  | {ctor: "Let", name: string, expr: Term, body: Term}
-  | {ctor: "Lam", name: string, body: Term}
-  | {ctor: "App", func: Term, argm: Term}
-  | {ctor: "Ctr", func: string, args: Array<Term>}
-  | {ctor: "Cal", func: string, args: Array<Term>}
+  = {$: "Var", name: string}
+  | {$: "Dup", nam0: string, nam1: string, expr: Term, body: Term}
+  | {$: "Let", name: string, expr: Term, body: Term}
+  | {$: "Lam", name: string, body: Term}
+  | {$: "App", func: Term, argm: Term}
+  | {$: "Ctr", name: string, args: Array<Term>}
+  | {$: "Cal", func: string, args: Array<Term>}
 
-export type Case
-  = {ctor: "Cse", func: string, args: Array<string>, body: Match}
+// Type
+// ----
+
+export type Type
+  = {$: "Type", name: string, ctrs: Array<{name: string, args: Array<string>}>}
+
+// Bond
+// ----
 
 export type Match
-  = {ctor: "Mat", expr: string, cses: Array<Case>}
-  | {ctor: "Ret", expr: Term}
+  = {$: "Case", expr: string, cses: Array<{name: string, args: Array<string>, body: Match}>}
+  | {$: "Body", expr: Term}
 
-export type Function
-  = {ctor: "Fun", name: string, args: Array<string>, body: Match}
+export type Bond
+  = {$: "Bond", name: string, args: Array<string>, body: Match}
 
-export type Constructor
-  = {ctor: "Con", numb: number, name: string, args: Array<string>}
+// File
+// ----
+
+export type Statement
+  = {$: "NewBond", bond: Bond}
+  | {$: "NewType", type: Type}
 
 export type File
-  = {ctor: "Fil", cons: Array<Constructor>, funs: Array<Function>}
+  = {$: "File", defs: Array<Statement>}
+
+// Constructors
+// ============
 
 // Term
 // ----
 
 export function Var(name: string) : Term {
-  return {ctor: "Var", name};
+  return {$: "Var", name};
 }
 
 export function Dup(nam0: string, nam1: string, expr: Term, body: Term) : Term {
-  return {ctor: "Dup", nam0, nam1, expr, body};
+  return {$: "Dup", nam0, nam1, expr, body};
 }
 
 export function Let(name: string, expr: Term, body: Term) : Term {
-  return {ctor: "Let", name, expr, body};
+  return {$: "Let", name, expr, body};
 }
 
 export function Lam(name: string, body: Term) : Term {
-  return {ctor: "Lam", name, body};
+  return {$: "Lam", name, body};
 }
 
 export function App(func: Term, argm: Term) : Term {
-  return {ctor: "App", func, argm};
+  return {$: "App", func, argm};
 }
 
-export function Ctr(func: string, args: Array<Term>) : Term {
-  return {ctor: "Ctr", func, args};
+export function Ctr(name: string, args: Array<Term>) : Term {
+  return {$: "Ctr", name, args};
 }
 
 export function Cal(func: string, args: Array<Term>) : Term {
-  return {ctor: "Cal", func, args};
+  return {$: "Cal", func, args};
 }
 
-// Function
+// Type
 // ----
 
-export function Cse(func: string, args: Array<string>, body: Match) : Case {
-  return {ctor: "Cse", func, args, body};
+export function Type(name: string, ctrs: Array<{name: string, args: Array<string>}>) : Type {
+  return {$: "Type", name, ctrs};
 }
 
-export function Mat(expr: string, cses: Array<Case>) : Match {
-  return {ctor: "Mat", expr, cses};
+// Bond
+// ----
+
+export function Case(expr: string, cses: Array<{name: string, args: Array<string>, body: Match}>) : Match {
+  return {$: "Case", expr, cses};
 }
 
-export function Ret(expr: Term) : Match {
-  return {ctor: "Ret", expr};
+export function Body(expr: Term) : Match {
+  return {$: "Body", expr};
 }
 
-export function Fun(name: string, args: Array<string>, body: Match) : Function {
-  return {ctor: "Fun", name, args, body};
+export function Bond(name: string, args: Array<string>, body: Match) : Bond {
+  return {$: "Bond", name, args, body};
 }
 
 // File
 // ----
 
-export function Con(numb: number, name: string, args: Array<string>) : Constructor {
-  return {ctor: "Con", numb, name, args};
+export function NewBond(bond: Bond) : Statement {
+  return {$: "NewBond", bond};
 }
 
-export function Fil(cons: Array<Constructor>, funs: Array<Function>) : File {
-  return {ctor: "Fil", cons, funs};
+export function NewType(type: Type) : Statement {
+  return {$: "NewType", type};
+}
+
+export function File(defs: Array<Statement>) : File {
+  return {$: "File", defs};
 }
 
 // Stringifier
-// -----------
+// ===========
 
-// Stringifies a term
+// Term
+// ----
+
 export function show_term(term: Term): string {
-  switch (term.ctor) {
+  switch (term.$) {
     case "Var": {
       return term.name;
     }
@@ -119,7 +144,7 @@ export function show_term(term: Term): string {
     }
     case "App": {
       let args = [];
-      while (term.ctor === "App") {
+      while (term.$ === "App") {
         args.push(show_term(term.argm));
         term = term.func;
       }
@@ -127,9 +152,9 @@ export function show_term(term: Term): string {
       return "(" + func + " " + args.reverse().join(" ") + ")";
     }
     case "Ctr": {
-      let func = term.func;
+      let name = term.name;
       let args = term.args.map(show_term);
-      return func + "{" + args.join(" ") + "}";
+      return name + "{" + args.join(" ") + "}";
     }
     case "Cal": {
       let func = term.func;
@@ -140,42 +165,73 @@ export function show_term(term: Term): string {
   return "?";
 }
 
+// Type
+// ----
+
+export function show_type(type: Type): string {
+  let ctrs = type.ctrs;
+  let ctrs_str = [];
+  for (var i = 0; i < ctrs.length; ++i) {
+    let ctr = ctrs[i];
+    let args = ctr.args;
+    ctrs_str.push(ctr.name + "{" + args.join(", ") + "}");
+  }
+  return "type " + type.name + " { " + ctrs_str.join(" ") + " }";
+}
+
+// Bond
+// ----
+
 export function show_match(match: Match): string {
-  switch (match.ctor) {
-    case "Mat": {
+  switch (match.$) {
+    case "Case": {
       let expr = match.expr;
       let cses = [];
       for (var i = 0; i < match.cses.length; ++i) {
-        let {func, args, body} = match.cses[i];
-        cses.push(func + "{" + args.join(",") + "}:" + show_match(body));
+        let {name, args, body} = match.cses[i];
+        cses.push(name + "{" + args.join(",") + "}:" + show_match(body));
       }
-      return "case " + expr + " {" + cses.join(" ") + "}";
+      return "case " + expr + " { " + cses.join(" ") + " }";
     }
-    case "Ret": {
+    case "Body": {
       return show_term(match.expr);
     }
   }
 }
 
-export function show_fun(fun: Function): string {
-  let args = fun.args;
-  let body = show_match(fun.body);
-  return "fun " + fun.name + "(" + args.join(",") + "): " + body;
+export function show_bond(bond: Bond): string {
+  let args = bond.args;
+  let body = show_match(bond.body);
+  return "bond " + bond.name + "(" + args.join(", ") + "): { " + body + " }";
 }
 
-export function show_con(con: Constructor): string {
-  var args = con.args;
-  return "con " + con.numb + " " + con.name + "{" + args.join(",") + "}";
-}
+// File
+// ----
 
 export function show_file(file: File): string {
-  var cons = file.cons.map(show_con).join("\n");
-  var func = file.funs.map(show_fun).join("\n");
-  return cons + "\n" + func;
+  let defs = file.defs;
+  let text = "";
+  for (var i = 0; i < defs.length; ++i) {
+    let def = defs[i];
+    switch (def.$) {
+      case "NewBond": {
+        text += show_bond(def.bond) + "\n";
+        break;
+      }
+      case "NewType": {
+        text += show_type(def.type) + "\n";
+        break;
+      }
+    }
+  }
+  return text;
 }
 
 // Parser
-// ------
+// ======
+
+// Term
+// ----
 
 export function parse_let() : P.Parser<Term | null> {
   return P.guard(P.match("let "), (state) => {
@@ -265,7 +321,26 @@ export function parse_term() : P.Parser<Term> {
   ]);
 }
 
-export function parse_mat() : P.Parser<Match | null> {
+// Type
+// ----
+
+export function parse_type() : P.Parser<Type | null> {
+  return P.guard(P.match("type "), (state) => {
+    var [state, skp0] = P.match("type ")(state);
+    var [state, name] = P.name1(state);
+    var [state, ctrs] = P.list(P.match("{"), P.match(","), P.match("}"), (state) => {
+      var left : P.Parser<[string,string[]]> = P.call(P.match("{"), P.match(","), P.match("}"), P.name1, (x,y)=>[x,y]);
+      var [state, [name,args]] = left(state);
+      return [state, {name, args}];
+    }, x => x)(state);
+    return [state, Type(name, ctrs)];
+  });
+}
+
+// Bond
+// ----
+
+export function parse_case() : P.Parser<Match | null> {
   return P.guard(P.match("case "), (state) => {
     var [state, skp0] = P.match("case ")(state);
     var [state, expr] = P.name1(state);
@@ -274,61 +349,57 @@ export function parse_mat() : P.Parser<Match | null> {
       var [state, [name,args]] = left(state);
       var [state, skp0] = P.consume(":")(state);
       var [state, body] = parse_match()(state);
-      return [state, Cse(name, args, body)];
+      return [state, {name, args, body}];
     }, x => x)(state);
-    return [state, Mat(expr, cses)];
+    return [state, Case(expr, cses)];
   });
 }
 
-export function parse_ret() : P.Parser<Match | null> {
+export function parse_body() : P.Parser<Match | null> {
   return (state) => {
     var [state, term] = parse_term()(state);
-    return [state, Ret(term)];
+    return [state, Body(term)];
   }
 };
 
 export function parse_match() : P.Parser<Match> {
   return P.grammar("Match", [
-    parse_mat(),
-    parse_ret(),
+    parse_case(),
+    parse_body(),
   ]);
 }
 
-export function parse_fun() : P.Parser<Function | null> {
-  return P.guard(P.match("fun "), (state) => {
+export function parse_bond() : P.Parser<Bond | null> {
+  return P.guard(P.match("bond "), (state) => {
     var parse_call : P.Parser<[string,string[]]> = P.call(P.match("("), P.match(","), P.match(")"), P.name1, (x,y)=>[x,y])
-    var [state, skp0] = P.match("fun ")(state);
+    var [state, skp0] = P.match("bond ")(state);
     var [state, [name,args]] = parse_call(state);
-    var [state, skp1] = P.consume(":")(state);
+    var [state, skp1] = P.consume("{")(state);
     var [state, body] = parse_match()(state);
-    return [state, Fun(name, args, body)];
+    var [state, skp2] = P.consume("}")(state);
+    return [state, Bond(name, args, body)];
   });
 }
 
-export function parse_con() : P.Parser<Constructor | null> {
-  return P.guard(P.match("con "), (state) => {
-    var [state, skp0] = P.match("con ")(state);
-    var [state, numb] = P.name1(state);
-    var [state, name] = P.name1(state);
-    var [state, args] = P.list(P.match("{"), P.match(","), P.match("}"), P.name1, x=>x)(state);
-    return [state, Con(Number(numb), name, args)];
-  });
-}
+// File
+// ----
 
 export function parse_file() : P.Parser<File> {
   return (state) => {
-    var [state, fun] = parse_fun()(state);
-    if (fun !== null) {
+    var [state, type] = parse_type()(state);
+    if (type !== null) {
       var [state, file] = parse_file()(state);
-      return [state, {...file, funs: [fun].concat(file.funs)}];
-    } else {
-      var [state, con] = parse_con()(state);
-      if (con !== null) {
-        var [state, file] = parse_file()(state);
-        return [state, {...file, cons: [con].concat(file.cons)}];
-      } else {
-        return [state, Fil([],[])];
-      }
+      return [state, File([NewType(type)].concat(file.defs))];
     }
+    var [state, bond] = parse_bond()(state);
+    if (bond !== null) {
+      var [state, file] = parse_file()(state);
+      return [state, File([NewBond(bond)].concat(file.defs))];
+    }
+    var [state, done] = P.done(state);
+    if (!done) {
+      P.expected_type("definition")(state);
+    }
+    return [state, File([])];
   };
 }
