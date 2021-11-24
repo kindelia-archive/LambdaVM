@@ -15,11 +15,7 @@ function dylib_suffix() {
 
 async function build_runtime(file: Kindash.File, target: string) {
   var comp = Compile.compile(file, target);
-  if (target === "c") {
-    var srcp = new URL("./Crusher/Runtime."+target, import.meta.url);
-  } else {
-    var srcp = new URL("./Crusher/Runtime."+target, import.meta.url);
-  }
+  var srcp = new URL("./Crusher/Runtime."+target, import.meta.url);
   var trgp = new URL("./../bin/Runtime."+target, import.meta.url);
   var code = (await Deno.readTextFile(srcp)).replace("//GENERATED_CODE//", comp);
   await Deno.writeTextFileSync(trgp, code);
@@ -74,15 +70,18 @@ function normal_clang(MEM: Crusher.Mem, host: Crusher.Loc): number {
 }
 
 export async function run(code: string, opts: any) {
-  var file = Kindash.read(Kindash.parse_file, code);
 
-  var main = file.funs[file.funs.length-1];
+  // Reads file as Kindash Defs
+  // --------------------------
+  
+  var file = Kindash.read(Kindash.parse_file, code);
+  var main = file.funs[file.funs.length - 1];
   if (main.name !== "main" || main.body.ctor !== "Ret") {
     throw "Main not found.";
   }
 
-  var term = main.body.expr;
-  var core = opts.core ? code : Convert.kindash_to_crusher(term, Compile.gen_name_table(file));
+  // Builds normalizer function
+  // --------------------------
 
   var normal : ((MEM: Crusher.Mem, host: Crusher.Loc) => number) | null = null;
 
@@ -98,15 +97,26 @@ export async function run(code: string, opts: any) {
     normal = Runtime.normal;
   }
 
-  console.log("Term:\n=====\n" + Kindash.show_term(term) + "\n");
-  console.log("Core:\n=====\n" + core + "\n");
+  // Builds runtime memory
+  // ---------------------
+
+  if (opts.core) {
+    var mem = Crusher.read_term(code);
+  } else {
+    var mem = Crusher.init();
+    Crusher.link(mem, 0, Crusher.lnk(Crusher.CAL, file.funs.length - 1, 0, 0));
+  }
+
+  // Evaluates main()
+  // ----------------
 
   if (normal !== null) {
-    var mem = Crusher.read_term(core);
     var gas = normal(mem, 0);
-    console.log("Norm:\n=====\n" + Convert.crusher_to_kindash(mem) + "\n");
-    console.log("Cost:\n=====\n- gas: " + gas + " \n- mem: " + mem.lnk.size);
-    //console.log(Crusher.show_mem(mem));
+    console.log("Norm:\n=====");
+    console.log(Convert.crusher_to_kindash(mem) + "\n");
+    console.log("Cost:\n=====");
+    console.log("- gas: " + gas);
+    console.log("- mem: " + mem.lnk.size);
   } else {
     console.log("Couldn't load runtime.");
   }

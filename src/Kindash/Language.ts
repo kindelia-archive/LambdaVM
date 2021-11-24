@@ -7,6 +7,7 @@ export * from "./Parser.ts"
 export type Term
   = {ctor: "Var", name: string}
   | {ctor: "Dup", nam0: string, nam1: string, expr: Term, body: Term}
+  | {ctor: "Let", name: string, expr: Term, body: Term}
   | {ctor: "Lam", name: string, body: Term}
   | {ctor: "App", func: Term, argm: Term}
   | {ctor: "Ctr", func: string, args: Array<Term>}
@@ -37,6 +38,10 @@ export function Var(name: string) : Term {
 
 export function Dup(nam0: string, nam1: string, expr: Term, body: Term) : Term {
   return {ctor: "Dup", nam0, nam1, expr, body};
+}
+
+export function Let(name: string, expr: Term, body: Term) : Term {
+  return {ctor: "Let", name, expr, body};
 }
 
 export function Lam(name: string, body: Term) : Term {
@@ -100,6 +105,12 @@ export function show_term(term: Term): string {
       let expr = show_term(term.expr);
       let body = show_term(term.body);
       return "dup " + nam0 + " " + nam1 + " = " + expr + " " + body;
+    }
+    case "Let": {
+      let name = term.name;
+      let expr = show_term(term.expr);
+      let body = show_term(term.body);
+      return "let " + name + " = " + expr + " " + body;
     }
     case "Lam": {
       let name = term.name;
@@ -173,7 +184,7 @@ export function parse_let() : P.Parser<Term | null> {
     var [state, skp1] = P.consume("=")(state);
     var [state, expr] = parse_term()(state);
     var [state, body] = parse_term()(state);
-    return [state, App(Lam(name,body),expr)];
+    return [state, Let(name, expr, body)];
   });
 }
 

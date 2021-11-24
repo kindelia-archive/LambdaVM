@@ -12,8 +12,32 @@ function line(tab: number, text: string) {
 
 export function sanitize(func: K.Function): K.Function {
   var size = 0;
+  var uses : {[key:string]: number} = {};
   function fresh() : string {
     return "x" + (size++);
+  }
+
+  function duplicator(name: string, expr: K.Term, body: K.Term): K.Term {
+    var amount = uses[name];
+    if (amount > 1) {
+      var vars = [];
+      for (var i = 0; i < (amount - 1) * 2; ++i) {
+        vars.push(i < amount - 2 ? "c." + i : name + "." + (i - (amount - 2)));
+      }
+      vars.reverse();
+      return (function go(i: number, body: K.Term): K.Term {
+        if (i === amount - 1) {
+          return body;
+        } else {
+          var var0 = vars.pop() as string;
+          var var1 = vars.pop() as string;
+          var exp0 = i === 0 ? expr : K.Var("c." + (i - 1));
+          return K.Dup(var0, var1, exp0, go(i + 1, body));
+        }
+      })(0, body);
+    } else {
+      return K.Let(name+".0", expr, body);
+    }
   }
 
   function sanitize_func(func: K.Function): K.Function {
@@ -23,11 +47,11 @@ export function sanitize(func: K.Function): K.Function {
       table[arg_name] = fresh();
     }
     var args = func.args.map(x => table[x] || x);
-    var body = sanitize_match(func.body, table);
+    var body = sanitize_match(func.body, table, args);
     return K.Fun(name, args, body);
   }
 
-  function sanitize_match(match: K.Match, table: {[key:string]:string}): K.Match {
+  function sanitize_match(match: K.Match, table: {[key:string]:string}, must_copy: string[]): K.Match {
     switch (match.ctor) {
       case "Mat": {
         let expr = table[match.expr] || match.expr;
@@ -40,13 +64,16 @@ export function sanitize(func: K.Function): K.Function {
             new_table[arg] = fresh();
           }
           let new_args = args.map(x => new_table[x] || x);
-          let new_body = sanitize_match(body, new_table);
+          let new_body = sanitize_match(body, new_table, must_copy.concat(new_args));
           return K.Cse(func, new_args, new_body);
         })
         return K.Mat(expr, cses);
       }
       case "Ret": {
         let expr = sanitize_term(match.expr, table); 
+        for (var arg of must_copy) {
+          expr = duplicator(arg, K.Var(arg), expr);
+        }
         return K.Ret(expr);
       }
     }
@@ -55,19 +82,34 @@ export function sanitize(func: K.Function): K.Function {
   function sanitize_term(term: K.Term, table: {[key:string]:string}): K.Term {
     switch (term.ctor) {
       case "Var": {
-        return K.Var(table[term.name] || term.name);
+        if (table[term.name]) {
+          var used = uses[table[term.name]] || 0;
+          var name = table[term.name] + "." + used;
+          uses[table[term.name]] = used + 1;
+          return K.Var(name);
+        } else {
+          throw "Error: unbound variable '" + term.name + "'.";
+        }
       }
       case "Dup": {
         let nam0 = fresh();
         let nam1 = fresh();
         let expr = sanitize_term(term.expr, table);
         let body = sanitize_term(term.body, {...table, [term.nam0]: nam0, [term.nam1]: nam1});
-        return K.Dup(nam0, nam1, expr, body);
+        return K.Dup(nam0+".0", nam1+".0", expr, body);
+      }
+      case "Let": {
+        let name = fresh();
+        let expr = sanitize_term(term.expr, table);
+        let body = sanitize_term(term.body, {...table, [term.name]: name});
+        var used = uses[name] || 0;
+        return duplicator(name, expr, body);
       }
       case "Lam": {
         let name = fresh();
         let body = sanitize_term(term.body, {...table, [term.name]: name});
-        return K.Lam(name, body);
+        var used = uses[name] || 0;
+        return K.Lam(name, duplicator(name, K.Var(name), body));
       }
       case "App": {
         let func = sanitize_term(term.func, table);
@@ -116,7 +158,6 @@ export function compile_function(func: K.Function, table: {[name:string]:number}
   function compile_match(match: K.Match, clear: Array<string>, tab: number) {
     switch (match.ctor) {
       case "Mat":
-        //console.log("get", match.expr, args);
         var expr_name = locs[match.expr] || "";
         text += line(tab, VAR+" " + expr_name + "$ = reduce(MEM, " + expr_name + ");");
         text += line(tab, "switch (get_tag("+expr_name+"$) == CTR ? get_ex0(" + expr_name + "$) : -1) {");
@@ -153,11 +194,17 @@ export function compile_function(func: K.Function, table: {[name:string]:number}
         return args[term.name] ? args[term.name] : "?";
       case "Dup":
         var name = fresh("dup");
+        var dupk = dups++;
         text += line(tab, VAR + " " + name + " = alloc(MEM, 3);");
-        args[term.nam0] = "lnk(DP0, 127, 0, "+name+")"; // TODO
-        args[term.nam1] = "lnk(DP1, 127, 0, "+name+")"; // TODO
+        args[term.nam0] = "lnk(DP0, " + dupk + ", 0, "+name+")"; // TODO
+        args[term.nam1] = "lnk(DP1, " + dupk + ", 0, "+name+")"; // TODO
         var expr = compile_term(term.expr, tab);
         text += line(tab, "link(MEM, "+name+"+2, "+expr+");");
+        var body = compile_term(term.body, tab);
+        return body;
+      case "Let":
+        var expr = compile_term(term.expr, tab);
+        args[term.name] = expr;
         var body = compile_term(term.body, tab);
         return body;
       case "Lam":
@@ -214,6 +261,7 @@ export function compile_function(func: K.Function, table: {[name:string]:number}
   var locs : {[name: string]: string} = {};
   var args : {[name: string]: string} = {};
   var uses : {[name: string]: number} = {};
+  var dups = 0;
   var text = "";
   var size = 0;
   //compile_func(func, tab);

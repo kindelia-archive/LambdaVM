@@ -78,6 +78,7 @@ export const skip : Parser<boolean> = (state: State) => {
   var [state, comment] = skip_comment(state);
   var [state, spaces] = skip_spaces(state);
   if (comment || spaces) {
+    var [state, skipped] = skip(state);
     return [state, true];
   } else {
     return [state, false];

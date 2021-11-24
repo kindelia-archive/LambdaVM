@@ -6,8 +6,8 @@ fun slow(n):
     Z{}:
       λx x
     S{pred}:
-      dup a b = λx (x slow(pred))
-      ((a λx x) (b λx x))
+      let rec = λx (x slow(pred))
+      ((rec λx x) (rec λx x))
   }
 
 fun main():

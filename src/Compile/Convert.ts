@@ -157,7 +157,7 @@ export function crusher_to_kindash(MEM: C.Mem, input_term: C.Lnk | null = null) 
           if (C.get_tag(C.get_lnk(MEM, term, 0)) !== C.NIL) {
             name = names[C.lnk(C.VAR, 0, 0, C.get_loc(term,0))] || "?";
           }
-          return "λ" + name + ":" + body;
+          return "λ" + name + " " + body;
         }
         case C.APP: {
           let func = go(C.get_lnk(MEM, term, 0), stacks, seen, depth + 1);

@@ -1,19 +1,15 @@
-con 0 T{}
 con 0 Z{}
 con 1 S{pred}
+con 0 tuple{a b c d}
 
 fun slow(x):
   case x {
-    Z{}:
-      λx x
-    S{pred}:
-      dup pred_a pred_b = pred
-      (slow(pred_a) slow(pred_b))
+    Z{}: λx x
+    S{pred}: (slow(pred) slow(pred))
   }
 
-
 fun main():
-  T{
+  tuple{
     slow(S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{Z{}}}}}}}}}}}}}}}}}}}}}}}}}}})
     slow(S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{Z{}}}}}}}}}}}}}}}}}}}}}}}}}}})
     slow(S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{S{Z{}}}}}}}}}}}}}}}}}}}}}}}}}}})
