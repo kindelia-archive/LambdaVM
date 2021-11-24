@@ -1,6 +1,6 @@
 // Importing a dylib on TypeScript
 
-import * as Kindash from "./Kindash/Language.ts"
+import * as Lambolt from "https://raw.githubusercontent.com/Kindelia/LamBolt/master/src/LamBolt.ts"
 import * as Crusher from "./Crusher/Language.ts"
 import * as Compile from "./Compile/Compile.ts"
 import * as Convert from "./Compile/Convert.ts"
@@ -13,7 +13,7 @@ function dylib_suffix() {
   }
 }
 
-async function build_runtime(file: Kindash.File, target: string) {
+async function build_runtime(file: Lambolt.File, target: string) {
   var comp = Compile.compile(file, target);
   var srcp = new URL("./Crusher/Runtime."+target, import.meta.url);
   var trgp = new URL("./../bin/Runtime."+target, import.meta.url);
@@ -71,11 +71,11 @@ function normal_clang(MEM: Crusher.Mem, host: Crusher.Loc): number {
 
 export async function run(code: string, opts: any) {
 
-  // Reads file as Kindash Defs
+  // Reads file as Lambolt Defs
   // --------------------------
   
-  var file = Kindash.read(Kindash.parse_file, code);
-  //console.log(Kindash.show_file(file));
+  var file = Lambolt.read(Lambolt.parse_file, code);
+  //console.log(Lambolt.show_file(file));
   var main = file.defs[file.defs.length - 1];
   if (!(main && main.$ === "NewBond" && main.bond.name === "main" && main.bond.body.$ === "Body")) {
     throw "Main not found.";
@@ -118,7 +118,7 @@ export async function run(code: string, opts: any) {
 
   if (normal !== null) {
     var gas = normal(mem, 0);
-    console.log(Convert.crusher_to_kindash(mem, Crusher.deref(mem,0), numb_table));
+    console.log(Convert.crusher_to_lambolt(mem, Crusher.deref(mem,0), numb_table));
     console.log("");
     console.log("* gas: " + gas);
     console.log("* mem: " + mem.lnk.size);

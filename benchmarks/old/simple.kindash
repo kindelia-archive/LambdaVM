@@ -1,0 +1,568 @@
+con 0 pair{}
+
+fun main():
+  pair{
+    (λfλx(f (f (f (f (f (f (f (f (f (f (f (f (f (f (f x))))))))))))))) λfλx(f (f x)) λbλtλf(b f t) λtλf(t))
+    (λfλx(f (f (f (f (f (f (f (f (f (f (f (f (f (f (f x))))))))))))))) λfλx(f (f x)) λbλtλf(b f t) λtλf(f))
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// Problema:
+// 
+// Apesar de serem expressões independentes,
+// o alocador de memória é compartilhado!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// O push multi-thread
+
+mem = [x y z 20]
+
+push(mem, val):
+  loc      = mem.size
+  mem.size = loc + 1
+  mem[loc] = val
+
+// {thread A} push(10)
+// {thread B} push(20)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// Solução: atomicos
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// Funciona! Mas tive que desabilitar a FreeList.
+// Mas por que a FreeList é importante?
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// Essa função deveria gastar memória constante!
+
+sum(n: Nat, r: Nat) {
+  case n {
+    zero: r
+    succ: sum(n.pred, n + r)
+  }
+
+sum(5,  0) ~>
+sum(4,  5) ~>
+sum(3,  9) ~>
+sum(2, 12) ~>
+sum(1, 14) ~>
+sum(0, 15) ~>
+15
+
+// Porém...
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// Sem FreeList...
+
+[(sum 5 0)]
+[(sum 5 0) (sum 4 5)]
+[_________ (sum 4 5)]
+[_________ (sum 4 5) (sum 3 9)]
+[_________ _________ (sum 3 9)]
+[_________ _________ (sum 3 9) (sum 2 12)]
+[_________ _________ _________ (sum 2 12)]
+[_________ _________ _________ (sum 2 12) (sum 1 14)]
+[_________ _________ _________ __________ (sum 1 14) (sum 0 15)]
+[_________ _________ _________ __________ __________ (sum 0 15)]
+[_________ _________ _________ __________ __________ 5]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// Com FreeList...
+
+[(sum 5 0)]
+[(sum 5 0)  (sum 4 5)]
+[__________ (sum 4 5)]
+
+// [__________ (sum 4 5) (sum 3 9)]
+
+[(sum 3 9)  (sum 4 5)]
+[(sum 3 9)  _________]
+
+[(sum 3 9)  (sum 2 12)]
+[__________ (sum 2 12)]
+
+[(sum 1 14) (sum 2 12)]
+[(sum 1 14) __________]
+
+[(sum 1 14) (sum 0 15)]
+[__________ (sum 0 15)]
+
+[__________ 15]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// Pensamento inocente:
+// "Uma FreeList é só um stack, então é só fazer o pop() thread-safe."
+
+mem = [x y z _]
+
+push(mem, val):
+  loc = atomic_inc(mem_size)
+  mem[loc] = val
+
+pop(mem):
+  loc = atomic_dec(mem_size)
+  return mem[loc]
+
+// {thread A} push(10)
+// {thread B} pop()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// E com locks?
+
+mem = [x y z]
+
+push(mem, val):
+  LOCK(mem)
+  loc = atomic_inc(mem_size)
+  mem[loc] = val
+  UNLOCK(mem)
+
+pop(mem):
+  LOCK(mem)
+  loc = atomic_dec(mem_size)
+  ret = mem[loc]
+  UNLOCK(mem)
+  return ret
+
+
+// {thread A} push(10)
+// {thread B} push(20)
+// {thread C} push(30)
+// {thread D} push(40)
+// {thread E} push(50)
+// {thread F} pop()
+
+
+
+
+
+
+
+
+
+
+
+stack lock-free
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// A busca por um stack lock-free...
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// A solução
+
+alloc(mem):
+  checa um slot aleatório
+  se estiver vazio:
+    escreve nele
+  se não:
+    aloca no final
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// 3 cenários:
+// ===========
+
+// 1. Memória quase lotada: 
+
+[AAA BBB CCC DDD ___ EEE FFF GGG HHH III JJJ ___ KKK LLL MMM NNN OOO FFF]
+
+// 2. Memória meio a meio:
+
+[AAA ___ ___ DDD ___ EEE FFF ___ HHH III JJJ ___ KKK LLL MMM ___ OOO FFF]
+
+// 3. Memória quase vazia:
+
+[___ ___ 000 ___ ___ ___ FFF ___ ___ III ___ XXX ___ ___ ___ ___ ___ ___ YYY]
+
+// Em média, um programa nunca vai ocupar 2x mais memória que o necessário.
+// Não vai haver estado corrupto, pois compare-and-swap ("insira se vazio") é atômico
+// Não vai haver espera, pois:
+// - Quase sempre, duas threads vão pegar slots vazios diferentes.
+// - Se duas pegam o mesmo slot vazio (raro), uma sai feliz e outra triste. Só isso. Sem espera.
+// - Se uma thread pega um slot cheio, ela só aloca mesmo. E está tudo bem.
+
+
+
+
+
+
+
+
+

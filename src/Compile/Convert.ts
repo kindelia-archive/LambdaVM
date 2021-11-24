@@ -1,7 +1,7 @@
 import * as C from "./../Crusher/Language.ts"
-import * as K from "./../Kindash/Language.ts"
+import * as LB from "https://raw.githubusercontent.com/Kindelia/LamBolt/master/src/LamBolt.ts"
 
-export function kindash_to_crusher(term: K.Term, table: {[name:string]:number}): string {
+export function lambolt_to_crusher(term: LB.Term, table: {[name:string]:number}): string {
   var vars = 0;
   var lets = 0;
   var dups = "";
@@ -99,7 +99,7 @@ export function kindash_to_crusher(term: K.Term, table: {[name:string]:number}):
   return text;
 }
 
-export function crusher_to_kindash(MEM: C.Mem, input_term: C.Lnk | null = null, table: {[idx:string]:string}) : string {
+export function crusher_to_lambolt(MEM: C.Mem, input_term: C.Lnk | null = null, table: {[idx:string]:string}) : string {
   var term : C.Lnk = input_term ? input_term : C.deref(MEM, 0);
   var names : C.MAP<string> = {};
   var count : number = 0;

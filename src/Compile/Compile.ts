@@ -1,4 +1,4 @@
-import * as K from "./../Kindash/Language.ts"
+import * as LB from "https://raw.githubusercontent.com/Kindelia/LamBolt/master/src/LamBolt.ts"
 
 // Compiler
 // --------
@@ -10,14 +10,14 @@ function line(tab: number, text: string) {
   return text + "\n";
 }
 
-export function sanitize(func: K.Bond): K.Bond {
+export function sanitize(func: LB.Bond): LB.Bond {
   var size = 0;
   var uses : {[key:string]: number} = {};
   function fresh() : string {
     return "x" + (size++);
   }
 
-  function duplicator(name: string, expr: K.Term, body: K.Term): K.Term {
+  function duplicator(name: string, expr: LB.Term, body: LB.Term): LB.Term {
     var amount = uses[name];
     if (amount > 1) {
       var vars = [];
@@ -25,22 +25,22 @@ export function sanitize(func: K.Bond): K.Bond {
         vars.push(i < amount - 2 ? "c." + i : name + "." + (i - (amount - 2)));
       }
       vars.reverse();
-      return (function go(i: number, body: K.Term): K.Term {
+      return (function go(i: number, body: LB.Term): LB.Term {
         if (i === amount - 1) {
           return body;
         } else {
           var var0 = vars.pop() as string;
           var var1 = vars.pop() as string;
-          var exp0 = i === 0 ? expr : K.Var("c." + (i - 1));
-          return K.Dup(var0, var1, exp0, go(i + 1, body));
+          var exp0 = i === 0 ? expr : LB.Var("c." + (i - 1));
+          return LB.Dup(var0, var1, exp0, go(i + 1, body));
         }
       })(0, body);
     } else {
-      return K.Let(name+".0", expr, body);
+      return LB.Let(name+".0", expr, body);
     }
   }
 
-  function sanitize_bond(bond: K.Bond): K.Bond {
+  function sanitize_bond(bond: LB.Bond): LB.Bond {
     var name = bond.name;
     var table : {[key:string]:string} = {};
     for (var arg_name of bond.args) {
@@ -48,17 +48,17 @@ export function sanitize(func: K.Bond): K.Bond {
     }
     var args = bond.args.map(x => table[x] || x);
     var body = sanitize_match(bond.body, table, args);
-    return K.Bond(name, args, body);
+    return LB.Bond(name, args, body);
   }
 
-  function sanitize_match(match: K.Match, table: {[key:string]:string}, must_copy: string[]): K.Match {
+  function sanitize_match(match: LB.Match, table: {[key:string]:string}, must_copy: string[]): LB.Match {
     switch (match.$) {
       case "Case": {
         let expr = table[match.expr] || match.expr;
-        let cses : Array<{name: string, args: Array<string>, body: K.Match}> = match.cses.map((cse) => {
+        let cses : Array<{name: string, args: Array<string>, body: LB.Match}> = match.cses.map((cse) => {
           let name : string = cse.name;
           let args : Array<string> = cse.args;
-          let body : K.Match = cse.body;
+          let body : LB.Match = cse.body;
           let new_table = {...table};
           for (let arg of args) {
             new_table[arg] = fresh();
@@ -67,26 +67,26 @@ export function sanitize(func: K.Bond): K.Bond {
           let new_body = sanitize_match(body, new_table, must_copy.concat(new_args));
           return {name, args: new_args, body: new_body};
         })
-        return K.Case(expr, cses);
+        return LB.Case(expr, cses);
       }
       case "Body": {
         let expr = sanitize_term(match.expr, table); 
         for (var arg of must_copy) {
-          expr = duplicator(arg, K.Var(arg), expr);
+          expr = duplicator(arg, LB.Var(arg), expr);
         }
-        return K.Body(expr);
+        return LB.Body(expr);
       }
     }
   }
 
-  function sanitize_term(term: K.Term, table: {[key:string]:string}): K.Term {
+  function sanitize_term(term: LB.Term, table: {[key:string]:string}): LB.Term {
     switch (term.$) {
       case "Var": {
         if (table[term.name]) {
           var used = uses[table[term.name]] || 0;
           var name = table[term.name] + "." + used;
           uses[table[term.name]] = used + 1;
-          return K.Var(name);
+          return LB.Var(name);
         } else {
           throw "Error: unbound variable '" + term.name + "'.";
         }
@@ -96,7 +96,7 @@ export function sanitize(func: K.Bond): K.Bond {
         let nam1 = fresh();
         let expr = sanitize_term(term.expr, table);
         let body = sanitize_term(term.body, {...table, [term.nam0]: nam0, [term.nam1]: nam1});
-        return K.Dup(nam0+".0", nam1+".0", expr, body);
+        return LB.Dup(nam0+".0", nam1+".0", expr, body);
       }
       case "Let": {
         let name = fresh();
@@ -109,22 +109,22 @@ export function sanitize(func: K.Bond): K.Bond {
         let name = fresh();
         let body = sanitize_term(term.body, {...table, [term.name]: name});
         var used = uses[name] || 0;
-        return K.Lam(name, duplicator(name, K.Var(name), body));
+        return LB.Lam(name, duplicator(name, LB.Var(name), body));
       }
       case "App": {
         let func = sanitize_term(term.func, table);
         let argm = sanitize_term(term.argm, table);
-        return K.App(func, argm);
+        return LB.App(func, argm);
       }
       case "Ctr": {
         let name = term.name;
         let args = term.args.map(x => sanitize_term(x,table));
-        return K.Ctr(name, args);
+        return LB.Ctr(name, args);
       }
       case "Cal": {
         let func = term.func;
         let args = term.args.map(x => sanitize_term(x, table));
-        return K.Cal(func, args);
+        return LB.Cal(func, args);
       }
     }
   }
@@ -132,7 +132,7 @@ export function sanitize(func: K.Bond): K.Bond {
   return sanitize_bond(func);
 }
 
-export function compile_bond(func: K.Bond, table: {[name:string]:number}, target: string, tab: number): string {
+export function compile_bond(func: LB.Bond, table: {[name:string]:number}, target: string, tab: number): string {
   if (target === "ts") {
     var VAR = "var"; 
     var GAS = "++GAS";
@@ -143,7 +143,7 @@ export function compile_bond(func: K.Bond, table: {[name:string]:number}, target
     throw "Unknown target: " + target;
   }
   
-  function compile_bond(bond: K.Bond, tab: number) {
+  function compile_bond(bond: LB.Bond, tab: number) {
     text += line(tab, "case " + table[bond.name] + ": {");
     for (var i = 0; i < bond.args.length; ++i) {
       locs[bond.args[i]] = define("loc", "get_loc(term, "+i+")", tab+1);
@@ -155,7 +155,7 @@ export function compile_bond(func: K.Bond, table: {[name:string]:number}, target
     text += line(tab, "}");
   }
 
-  function compile_match(match: K.Match, clear: Array<string>, tab: number) {
+  function compile_match(match: LB.Match, clear: Array<string>, tab: number) {
     switch (match.$) {
       case "Case":
         var expr_name = locs[match.expr] || "";
@@ -188,7 +188,7 @@ export function compile_bond(func: K.Bond, table: {[name:string]:number}, target
     }
   }
 
-  function compile_term(term: K.Term, tab: number) : string {
+  function compile_term(term: LB.Term, tab: number) : string {
     switch (term.$) {
       case "Var":
         return args[term.name] ? args[term.name] : "?";
@@ -269,7 +269,7 @@ export function compile_bond(func: K.Bond, table: {[name:string]:number}, target
   return text;
 }
 
-export function gen_name_table(file: K.File) : {[name: string]: number} {
+export function gen_name_table(file: LB.File) : {[name: string]: number} {
   var table : {[name: string]: number} = {};
   var fresh = 0;
   for (var i = 0; i < file.defs.length; ++i) {
@@ -288,7 +288,7 @@ export function gen_name_table(file: K.File) : {[name: string]: number} {
   return table;
 }
 
-export function compile(file: K.File, target: string) {
+export function compile(file: LB.File, target: string) {
   var table = gen_name_table(file);
 
   var code = "";

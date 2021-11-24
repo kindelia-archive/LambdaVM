@@ -1,6 +1,6 @@
-# Kindash
+# CaseCrusher
 
-A next-gen Optimal Functional Runtime.
+A next-gen, massively parallel, beta-optimal functional runtime.
 
 ## Installing
 
@@ -9,29 +9,35 @@ A next-gen Optimal Functional Runtime.
 2. Paste this command to install `CaseCrusher`:
 
 ```bash
-deno --unstable install -n crush --allow-all https://raw.githubusercontent.com/taelin-org/CaseCrusher/master/src/CLI.ts
+deno --unstable install -n crush --allow-all https://raw.githubusercontent.com/kindelia/CaseCrusher/master/src/main.ts
 ```
 
-3. Create a Kindash file:
+3. Create a [Lambolt](https://github.com/kindelia/lambolt) file:
 
 ```javascript
-// main.kindash
+// main.bolt
 
-con 0 zero{}
-con 1 succ{pred}
+type Nat {
+  zero{}
+  succ{pred}
+}
 
-fun double(n):
+bond double(n) {
   case n {
-    zero{}: zero{}
-    succ{pred}: succ{succ{double(pred)}}
+    zero{}:
+      zero{}
+    succ{pred}:
+      succ{succ{double(pred)}}
   }
+}
 
-fun main(): 
-  double(succ{succ{succ{zero{}}}})
+bond main() {
+  double(succ{succ{zero{}}})
+}
 ```
 
 4. Crush it:
 
 ```bash
-crush main.kindash
+crush main.bolt
 ```

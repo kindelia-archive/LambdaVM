@@ -1,8 +1,0 @@
-// Doubles using Church-Encoding
-bond main() {
-  let Z = λs λz z
-  let S = λn λs λz (s (n s z))
-  let D = λa (a λp (S (S p)) Z)
-  (D λs λz (s (s (s z))))
-}
-
