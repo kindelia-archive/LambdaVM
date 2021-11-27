@@ -20,13 +20,7 @@ const u8 ARG = 7;
 const u8 CTR = 8;
 const u8 CAL = 9;
 
-typedef u8  Tag;
-typedef u8  Ex0;
-typedef u8  Ex1;
-typedef u32 Pos;
-
 typedef u64 Lnk;
-typedef u64 Loc;
 
 typedef struct {
   u64 size;
@@ -94,45 +88,85 @@ u64 array_pop(Arr* arr) {
 // Memory
 // ------
 
-Lnk lnk(Tag tag, Ex0 ex0, Ex1 ex1, Loc pos) {
-  return tag | (ex0 << 4) | (ex1 << 12) | (pos << 20);
+Lnk Nil() {
+  return NIL;
 }
 
-Tag get_tag(Lnk lnk) {
+Lnk Lam(u64 pos) {
+  return LAM | (pos << 24);
+}
+
+Lnk App(u64 pos) {
+  return APP | (pos << 24);
+}
+
+Lnk Par(u64 col, u64 pos) {
+  return PAR | (col << 4) | (pos << 24);
+}
+
+Lnk Dp0(u64 col, u64 pos) {
+  return DP0 | (col << 4) | (pos << 24);
+}
+
+Lnk Dp1(u64 col, u64 pos) {
+  return DP1 | (col << 4) | (pos << 24);
+}
+
+Lnk Var(u64 pos) {
+  return VAR | (pos << 24);
+}
+
+Lnk Arg(u64 pos) {
+  return ARG | (pos << 24);
+}
+
+Lnk Ctr(u64 fun, u64 ari, u64 pos) {
+  return CTR | (fun << 4) | (ari << 20) | (pos << 24);
+}
+
+Lnk Cal(u64 fun, u64 ari, u64 pos) {
+  return CAL | (fun << 4) | (ari << 20) | (pos << 24);
+}
+
+u64 get_tag(Lnk lnk) {
   return lnk & 0xF;
 }
 
-Ex0 get_ex0(Lnk lnk) {
-  return (lnk >> 4) & 0xFF;
+u64 get_col(Lnk lnk) {
+  return (lnk >> 4) & 0xFFFFF;
 }
 
-Ex1 get_ex1(Lnk lnk) {
-  return (lnk >> 12) & 0xFF;
+u64 get_fun(Lnk lnk) {
+  return (lnk >> 4) & 0xFFFF;
 }
 
-Loc get_loc(Lnk lnk, u8 arg) {
-  return (lnk >> 20) + arg;
+u64 get_ari(Lnk lnk) {
+  return (lnk >> 20) & 0xF;
+}
+
+u64 get_loc(Lnk lnk, u64 arg) {
+  return (lnk >> 24) + arg;
 }
 
 Lnk get_lnk(Mem* mem, Lnk lnk, u8 arg) {
   return array_read(mem->lnk, get_loc(lnk, arg));
 }
 
-Lnk deref(Mem* mem, Loc loc) {
+Lnk deref(Mem* mem, u64 loc) {
   return array_read(mem->lnk, loc);
 }
 
-u64 link(Mem* mem, Loc loc, Lnk link) {
+u64 link(Mem* mem, u64 loc, Lnk link) {
   array_write(mem->lnk, loc, link);
   switch (get_tag(link)) {
-    case VAR: array_write(mem->lnk, get_loc(link,0), lnk(ARG,0,0,loc)); break;
-    case DP0: array_write(mem->lnk, get_loc(link,0), lnk(ARG,0,0,loc)); break;
-    case DP1: array_write(mem->lnk, get_loc(link,1), lnk(ARG,0,0,loc)); break;
+    case VAR: array_write(mem->lnk, get_loc(link,0), Arg(loc)); break;
+    case DP0: array_write(mem->lnk, get_loc(link,0), Arg(loc)); break;
+    case DP1: array_write(mem->lnk, get_loc(link,1), Arg(loc)); break;
   }
   return link;
 }
 
-Loc alloc(Mem* mem, u64 size) {
+u64 alloc(Mem* mem, u64 size) {
   if (size == 0) {
     return 0;
   } else {
@@ -149,7 +183,7 @@ Loc alloc(Mem* mem, u64 size) {
   }
 }
 
-void clear(Mem* mem, Loc loc, u64 size) {
+void clear(Mem* mem, u64 loc, u64 size) {
   if (size > 0) {
     array_push(&mem->use[size], loc);
   }
@@ -162,7 +196,7 @@ void collect(Mem* mem, Lnk term) {
   switch (get_tag(term)) {
     case LAM: {
       if (get_tag(get_lnk(mem,term,0)) != NIL) {
-        link(mem, get_loc(get_lnk(mem,term,0),0), lnk(NIL,0,0,0));
+        link(mem, get_loc(get_lnk(mem,term,0),0), Nil());
       }
       collect(mem, get_lnk(mem,term,1));
       clear(mem, get_loc(term,0), 2);
@@ -181,16 +215,16 @@ void collect(Mem* mem, Lnk term) {
       break;
     }
     case DP0: {
-      link(mem, get_loc(term,0), lnk(NIL,0,0,0));
+      link(mem, get_loc(term,0), Nil());
       break;
     }
     case DP1: {
-      link(mem, get_loc(term,1), lnk(NIL,0,0,0));
+      link(mem, get_loc(term,1), Nil());
       break;
     }
     case CTR:
     case CAL: {
-      Ex1 arity = get_ex1(term);
+      u64 arity = get_ari(term);
       for (u64 i = 0; i < arity; ++i) {
         collect(mem, get_lnk(mem,term,i));
       }
@@ -198,7 +232,7 @@ void collect(Mem* mem, Lnk term) {
       break;
     }
     case VAR: {
-      link(mem, get_loc(term,0), lnk(NIL,0,0,0));
+      link(mem, get_loc(term,0), Nil());
       break;
     }
   }
@@ -215,9 +249,9 @@ void subst(Mem* mem, Lnk lnk, Lnk val) {
   }
 }
 
-Lnk reduce(Mem* MEM, Loc host) {
+Lnk reduce(Mem* MEM, u64 host) {
   while (1) {
-    Loc term = deref(MEM, host);
+    u64 term = deref(MEM, host);
     switch (get_tag(term)) {
       case APP: {
         Lnk func = reduce(MEM, get_loc(term,0));
@@ -244,13 +278,13 @@ Lnk reduce(Mem* MEM, Loc host) {
             u64 let0 = alloc(MEM, 3);
             u64 par0 = alloc(MEM, 2);
             link(MEM, let0+2, get_lnk(MEM, term, 1));
-            link(MEM, app0+1, lnk(DP0, get_ex0(func), 0, let0));
+            link(MEM, app0+1, Dp0(get_col(func), let0));
             link(MEM, app0+0, get_lnk(MEM, func, 0));
             link(MEM, app1+0, get_lnk(MEM, func, 1));
-            link(MEM, app1+1, lnk(DP1, get_ex0(func), 0, let0));
-            link(MEM, par0+0, lnk(APP, 0, 0, app0));
-            link(MEM, par0+1, lnk(APP, 0, 0, app1));
-            return link(MEM, host, lnk(PAR, get_ex0(func), 0, par0));
+            link(MEM, app1+1, Dp1(get_col(func), let0));
+            link(MEM, par0+0, App(app0));
+            link(MEM, par0+1, App(app1));
+            return link(MEM, host, Par(get_col(func), par0));
           }
         }
         break;
@@ -261,10 +295,10 @@ Lnk reduce(Mem* MEM, Loc host) {
         switch (get_tag(expr)) {
           // !A<r s> = λx: f
           // --------------- LET-LAM
+          // !A<f0 f1> = f
           // r <- λx0: f0
           // s <- λx1: f1
           // x <- &A<x0 x1>
-          // !A<f0 f1> = f
           // ~
           case LAM: {
             inc_gas(MEM);
@@ -275,28 +309,28 @@ Lnk reduce(Mem* MEM, Loc host) {
             u64 lam1 = alloc(MEM, 2);
 
             link(MEM, let0+2, get_lnk(MEM, expr, 1));
-            link(MEM, par0+1, lnk(VAR, 0, 0, lam1));
+            link(MEM, par0+1, Var(lam1));
 
             Lnk expr_lnk_0 = get_lnk(MEM, expr, 0);
-            link(MEM, par0+0, lnk(VAR, 0, 0, lam0));
-            subst(MEM, expr_lnk_0, lnk(PAR, get_ex0(term), 0, par0));
+            link(MEM, par0+0, Var(lam0));
+            subst(MEM, expr_lnk_0, Par(get_col(term), par0));
 
             Lnk term_lnk_0 = get_lnk(MEM,term,0);
-            link(MEM, lam0+1, lnk(DP0, get_ex0(term), 0, let0));
-            subst(MEM, term_lnk_0, lnk(LAM, 0, 0, lam0));
+            link(MEM, lam0+1, Dp0(get_col(term), let0));
+            subst(MEM, term_lnk_0, Lam(lam0));
 
             Lnk term_lnk_1 = get_lnk(MEM,term,1);
-            link(MEM, lam1+1, lnk(DP1, get_ex0(term), 0, let0));
-            subst(MEM, term_lnk_1, lnk(LAM, 0, 0, lam1));
+            link(MEM, lam1+1, Dp1(get_col(term), let0));
+            subst(MEM, term_lnk_1, Lam(lam1));
 
-            link(MEM, host, lnk(LAM, 0, 0, get_tag(term) == DP0 ? lam0 : lam1));
+            link(MEM, host, Lam(get_tag(term) == DP0 ? lam0 : lam1));
 
             continue;
           }
           case PAR: {
             inc_gas(MEM);
 
-            if (get_ex0(term) == get_ex0(expr)) {
+            if (get_col(term) == get_col(expr)) {
               subst(MEM, get_lnk(MEM,term,0), get_lnk(MEM,expr,0));
               subst(MEM, get_lnk(MEM,term,1), get_lnk(MEM,expr,1));
               link(MEM, host, get_lnk(MEM, expr, get_tag(term) == DP0 ? 0 : 1));
@@ -310,44 +344,44 @@ Lnk reduce(Mem* MEM, Loc host) {
               u64 par1 = get_loc(expr,0);
               u64 let1 = alloc(MEM, 3);
 
-              link(MEM, let0+2, get_lnk(MEM,expr,0));                         // w:let0[2] r:par1[0]
-              link(MEM, let1+2, get_lnk(MEM,expr,1));                         // w:let1[2] r:par1[1]
+              link(MEM, let0+2, get_lnk(MEM,expr,0));
+              link(MEM, let1+2, get_lnk(MEM,expr,1));
 
               Lnk term_lnk_1 = get_lnk(MEM,term,1);
-              link(MEM, par1+0, lnk(DP1,get_ex0(term),0,let0));               // w:par1[0] w:let0[1]
-              link(MEM, par1+1, lnk(DP1,get_ex0(term),0,let1));               // w:par1[1] w:let1[1]
-              subst(MEM, term_lnk_1, lnk(PAR,get_ex0(expr),0,par1));          // r:let0[1] d:par1
+              link(MEM, par1+0, Dp1(get_col(term),let0));
+              link(MEM, par1+1, Dp1(get_col(term),let1));
+              subst(MEM, term_lnk_1, Par(get_col(expr),par1));
 
               Lnk term_lnk_0 = get_lnk(MEM,term,0);
-              link(MEM, par0+0, lnk(DP0,get_ex0(term),0,let0));               // w:par0[0] w:let0[0]
-              link(MEM, par0+1, lnk(DP0,get_ex0(term),0,let1));               // w:par0[1] w:let1[0]
-              subst(MEM, term_lnk_0, lnk(PAR,get_ex0(expr),0,par0));          // r:let0[0] d:par0
+              link(MEM, par0+0, Dp0(get_col(term),let0));
+              link(MEM, par0+1, Dp0(get_col(term),let1));
+              subst(MEM, term_lnk_0, Par(get_col(expr),par0));
 
-              return link(MEM, host, lnk(PAR, get_ex0(expr), 0, get_tag(term) == DP0 ? par0 : par1));
+              return link(MEM, host, Par(get_col(expr), get_tag(term) == DP0 ? par0 : par1));
             }
           }
           case CTR: {
             inc_gas(MEM);
-            u64 func = get_ex0(expr);
-            u64 arit = get_ex1(expr);
+            u64 func = get_fun(expr);
+            u64 arit = get_ari(expr);
             if (arit == 0) {
-              subst(MEM, get_lnk(MEM,term,0), lnk(CTR, func, 0, 0));
-              subst(MEM, get_lnk(MEM,term,1), lnk(CTR, func, 0, 0));
+              subst(MEM, get_lnk(MEM,term,0), Ctr(func, 0, 0));
+              subst(MEM, get_lnk(MEM,term,1), Ctr(func, 0, 0));
               clear(MEM, get_loc(term,0), 3);
-              return link(MEM, host, lnk(CTR, func, 0, 0));
+              return link(MEM, host, Ctr(func, 0, 0));
             } else {
               u64 ctr0 = get_loc(expr,0);
               u64 ctr1 = alloc(MEM, arit);
-              subst(MEM, get_lnk(MEM,term,0), lnk(CTR, func, arit, ctr0));
-              subst(MEM, get_lnk(MEM,term,1), lnk(CTR, func, arit, ctr1));
+              subst(MEM, get_lnk(MEM,term,0), Ctr(func, arit, ctr0));
+              subst(MEM, get_lnk(MEM,term,1), Ctr(func, arit, ctr1));
               for (u64 i = 0; i < arit; ++i) {
                 u64 leti = i == 0 ? get_loc(term,0) : alloc(MEM, 3);
                 Lnk expr_lnk_i = get_lnk(MEM, expr, i);
-                link(MEM, ctr0+i, lnk(DP0, 0, 0, leti));
-                link(MEM, ctr1+i, lnk(DP1, 0, 0, leti));
+                link(MEM, ctr0+i, Dp0(get_col(term), leti));
+                link(MEM, ctr1+i, Dp1(get_col(term), leti));
                 link(MEM, leti+2, expr_lnk_i);
               }
-              return link(MEM, host, lnk(CTR, func, arit, get_tag(term) == DP0 ? ctr0 : ctr1));
+              return link(MEM, host, Ctr(func, arit, get_tag(term) == DP0 ? ctr0 : ctr1));
             }
           }
         }
@@ -355,7 +389,7 @@ Lnk reduce(Mem* MEM, Loc host) {
       }
 
       case CAL: {
-        switch (get_ex0(term))
+        switch (get_fun(term))
         // START GENERATED CODE
         {
 //GENERATED_CODE//
@@ -378,10 +412,10 @@ u8 get_bit(u64* bits, u8 bit) {
     return (bits[bit >> 6] >> (bit & 0x3F)) & 1;
 }
 
-void normal_fork(u64 tid, Loc host);
+void normal_fork(u64 tid, u64 host);
 void normal_join(u64 tid);
 
-Lnk normal_cont(Mem* MEM, Loc host, u64* seen) {
+Lnk normal_cont(Mem* MEM, u64 host, u64* seen) {
   Lnk term = deref(MEM, host);
   if (get_bit(seen, get_loc(term,0))) {
     return term;
@@ -412,14 +446,14 @@ Lnk normal_cont(Mem* MEM, Loc host, u64* seen) {
         return term;
       }
       case CAL: {
-        u64 arity = (u64)get_ex1(term);
+        u64 arity = (u64)get_ari(term);
         for (u64 i = 0; i < arity; ++i) {
           link(MEM, get_loc(term,i), normal_cont(MEM, get_loc(term,i), seen));
         }
         return term;
       }
       case CTR: {
-        u64 arity = (u64)get_ex1(term);
+        u64 arity = (u64)get_ari(term);
         if (CAN_SPAWN_WORKERS && arity > 1 && arity <= MAX_WORKERS) {
           CAN_SPAWN_WORKERS = 1;
           for (u64 t = 0; t < arity; ++t) {
@@ -443,7 +477,7 @@ Lnk normal_cont(Mem* MEM, Loc host, u64* seen) {
   }
 }
 
-Lnk normal(Mem* MEM, Loc host) {
+Lnk normal(Mem* MEM, u64 host) {
   const u64 size = 2097152; // uses 16 MB, covers heaps up to 1 GB
   static u64 seen[size]; 
   for (u64 i = 0; i < size; ++i) {
@@ -458,7 +492,7 @@ void *normal_thread(void *args_ptr) {
   return 0;
 }
 
-void normal_fork(u64 tid, Loc host) {
+void normal_fork(u64 tid, u64 host) {
   printf("* spawning thread: %llu\n", tid);
   workers[tid].host = host;
   pthread_create(&workers[tid].thread, NULL, &normal_thread, (void*)tid);

@@ -160,7 +160,7 @@ export function compile_bond(func: LB.Bond, table: {[name:string]:number}, targe
       case "Case":
         var expr_name = locs[match.expr] || "";
         text += line(tab, VAR+" " + expr_name + "$ = reduce(MEM, " + expr_name + ");");
-        text += line(tab, "switch (get_tag("+expr_name+"$) == CTR ? get_ex0(" + expr_name + "$) : -1) {");
+        text += line(tab, "switch (get_tag("+expr_name+"$) == CTR ? get_fun(" + expr_name + "$) : -1) {");
         for (var i = 0; i < match.cses.length; ++i) {
           var cse = match.cses[i];
           text += line(tab+1, "case " + (table[cse.name]||0) + ": {");
@@ -196,8 +196,8 @@ export function compile_bond(func: LB.Bond, table: {[name:string]:number}, targe
         var name = fresh("dup");
         var dupk = dups++;
         text += line(tab, VAR + " " + name + " = alloc(MEM, 3);");
-        args[term.nam0] = "lnk(DP0, " + dupk + ", 0, "+name+")"; // TODO
-        args[term.nam1] = "lnk(DP1, " + dupk + ", 0, "+name+")"; // TODO
+        args[term.nam0] = "Dp0(" + dupk + ", "+name+")"; // TODO
+        args[term.nam1] = "Dp1(" + dupk + ", "+name+")"; // TODO
         var expr = compile_term(term.expr, tab);
         text += line(tab, "link(MEM, "+name+"+2, "+expr+");");
         var body = compile_term(term.body, tab);
@@ -210,10 +210,10 @@ export function compile_bond(func: LB.Bond, table: {[name:string]:number}, targe
       case "Lam":
         var name = fresh("lam");
         text += line(tab, VAR + " " + name + " = alloc(MEM, 2);");
-        args[term.name] = "lnk(VAR, 0, 0, "+name+")";
+        args[term.name] = "Var("+name+")";
         var body = compile_term(term.body, tab);
         text += line(tab, "link(MEM, " + name+"+1, " + body + ");");
-        return "lnk(LAM, 0, 0, " + name + ")";
+        return "Lam(" + name + ")";
       case "App":
         var name = fresh("app");
         var func = compile_term(term.func, tab);
@@ -221,7 +221,7 @@ export function compile_bond(func: LB.Bond, table: {[name:string]:number}, targe
         text += line(tab, VAR + " " + name + " = alloc(MEM, 2);");
         text += line(tab, "link(MEM, " + name+"+0, " + func + ");");
         text += line(tab, "link(MEM, " + name+"+1, " + argm + ");");
-        return "lnk(APP, 0, 0, " + name + ")";
+        return "App(" + name + ")";
       case "Ctr":
         var ctr_args : Array<string> = [];
         for (var i = 0; i < term.args.length; ++i) {
@@ -232,7 +232,7 @@ export function compile_bond(func: LB.Bond, table: {[name:string]:number}, targe
         for (var i = 0; i < ctr_args.length; ++i) {
           text += line(tab, "link(MEM, " + name+"+"+i + ", " + ctr_args[i] + ");");
         }
-        return "lnk(CTR, " + (table[term.name]||0) + ", " + ctr_args.length + ", " + name + ")";
+        return "Ctr(" + (table[term.name]||0) + ", " + ctr_args.length + ", " + name + ")";
       case "Cal":
         var cal_args : Array<string> = [];
         for (var i = 0; i < term.args.length; ++i) {
@@ -244,7 +244,7 @@ export function compile_bond(func: LB.Bond, table: {[name:string]:number}, targe
         for (var i = 0; i < cal_args.length; ++i) {
           text += line(tab, "link(MEM, " + name+"+"+i + ", " + cal_args[i] + ");");
         }
-        return "lnk(CAL, " + (table[term.func]||0) + ", " + cal_args.length + ", " + name + ")";
+        return "Cal(" + (table[term.func]||0) + ", " + cal_args.length + ", " + name + ")";
     }
   }
 

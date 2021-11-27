@@ -110,7 +110,7 @@ export function crusher_to_lambolt(MEM: C.Mem, input_term: C.Lnk | null = null, 
       switch (C.get_tag(term)) {
         case C.LAM:
           if (C.get_tag(C.get_lnk(MEM, term, 0)) !== C.NIL) {
-            names[C.lnk(C.VAR, 0, 0, C.get_loc(term,0))] = "x" + (++count);
+            names[C.Var(C.get_loc(term,0))] = "x" + (++count);
           }
           name(C.get_lnk(MEM, term, 1), depth + 1);
           break;
@@ -129,13 +129,13 @@ export function crusher_to_lambolt(MEM: C.Mem, input_term: C.Lnk | null = null, 
           name(C.get_lnk(MEM, term, 2), depth + 1);
           break;
         case C.CTR:
-          var arity = C.get_ex1(term);
+          var arity = C.get_ari(term);
           for (var i = 0; i < arity; ++i) {
             name(C.get_lnk(MEM, term, i), depth + 1);
           }
           break;
         case C.CAL:
-          var arity = C.get_ex1(term);
+          var arity = C.get_ari(term);
           for (var i = 0; i < arity; ++i) {
             name(C.get_lnk(MEM, term, i), depth + 1);
           }
@@ -155,7 +155,7 @@ export function crusher_to_lambolt(MEM: C.Mem, input_term: C.Lnk | null = null, 
           let body = go(C.get_lnk(MEM, term, 1), stacks, seen, depth + 1);
           let name = "~";
           if (C.get_tag(C.get_lnk(MEM, term, 0)) !== C.NIL) {
-            name = names[C.lnk(C.VAR, 0, 0, C.get_loc(term,0))] || "?";
+            name = names[C.Var(C.get_loc(term,0))] || "?";
           }
           return "λ" + name + " " + body;
         }
@@ -165,7 +165,7 @@ export function crusher_to_lambolt(MEM: C.Mem, input_term: C.Lnk | null = null, 
           return "(" + func + " " + argm + ")"
         }
         case C.PAR: {
-          let col = C.get_ex0(term);
+          let col = C.get_col(term);
           if (!stacks[col]) {
             stacks[col] = "";
           }
@@ -182,16 +182,16 @@ export function crusher_to_lambolt(MEM: C.Mem, input_term: C.Lnk | null = null, 
           }
         }
         case C.DP0: {
-          let col = C.get_ex0(term);
+          let col = C.get_col(term);
           return "" + go(C.get_lnk(MEM, term, 2), {...stacks,[col]:"0"+stacks[col]}, seen, depth + 1);
         }
         case C.DP1: {
-          let col = C.get_ex0(term);
+          let col = C.get_col(term);
           return "" + go(C.get_lnk(MEM, term, 2), {...stacks,[col]:"1"+stacks[col]}, seen, depth + 1);
         }
         case C.CTR: {
-          let func = C.get_ex0(term);
-          var arit = C.get_ex1(term);
+          let func = C.get_fun(term);
+          var arit = C.get_ari(term);
           let args = [];
           for (let i = 0; i < arit; ++i) {
             args.push(go(C.get_lnk(MEM, term, i), stacks, seen, depth + 1));
@@ -200,8 +200,8 @@ export function crusher_to_lambolt(MEM: C.Mem, input_term: C.Lnk | null = null, 
           return name+ "{" + args.join(" ") + "}";
         }
         case C.CAL: {
-          let func = C.get_ex0(term);
-          var arit = C.get_ex1(term);
+          let func = C.get_fun(term);
+          var arit = C.get_ari(term);
           let args = [];
           for (let i = 0; i < arit; ++i) {
             args.push(go(C.get_lnk(MEM, term, i), stacks, seen, depth + 1));

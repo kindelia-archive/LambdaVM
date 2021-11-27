@@ -45,7 +45,7 @@ function load_c_dylib() {
   });
 }
 
-function normal_clang(MEM: Crusher.Mem, host: Crusher.Loc): number {
+function normal_clang(MEM: Crusher.Mem, host: number): number {
   var dylib = load_c_dylib();
 
   function convert(arr: Uint32Array): Uint8Array {
@@ -89,7 +89,7 @@ export async function run(code: string, opts: any) {
   // Builds normalizer function
   // --------------------------
 
-  var normal : ((MEM: Crusher.Mem, host: Crusher.Loc) => number) | null = null;
+  var normal : ((MEM: Crusher.Mem, host: number) => number) | null = null;
 
   if (opts.target === "c") {
     await build_runtime(file, "c");
@@ -110,7 +110,7 @@ export async function run(code: string, opts: any) {
     var mem = Crusher.read_term(code);
   } else {
     var mem = Crusher.init();
-    Crusher.link(mem, 0, Crusher.lnk(Crusher.CAL, name_table["main"] || 0, 0, 0));
+    Crusher.link(mem, 0, Crusher.Cal(name_table["main"] || 0, 0, 0));
   }
 
   // Evaluates main()
