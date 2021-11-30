@@ -307,6 +307,7 @@ export function reduce(MEM: Mem, host: number) : Lnk {
   while (true) {
 
     var term = deref(MEM, host);
+    //console.log("reduce", debug_show(MEM,deref(MEM,0)));
 
     switch (get_tag(term)) {
       case APP: {
@@ -640,4 +641,128 @@ function normal_go(MEM: Mem, host: number, seen: MAP<boolean>) : Lnk {
       }
     }
   }
+}
+
+// Debug
+// -----
+
+export function debug_show(MEM: Mem, term: Lnk, table: {[str:string]:string}) : string {
+  var lets : {[key:string]:number} = {};
+  var kinds : {[key:string]:number} = {};
+  var names : {[key:string]:string} = {};
+  var count = 0;
+  function find_lets(term: Lnk) {
+    switch (get_tag(term)) {
+      case LAM: {
+        names[get_loc(term,0)] = String(++count);
+        find_lets(get_lnk(MEM, term, 1));
+        break;
+      }
+      case APP: {
+        find_lets(get_lnk(MEM, term, 0));
+        find_lets(get_lnk(MEM, term, 1));
+        break;
+      }
+      case PAR: {
+        find_lets(get_lnk(MEM, term, 0));
+        find_lets(get_lnk(MEM, term, 1));
+        break;
+      }
+      case DP0: {
+        if (!lets[get_loc(term,0)]) {
+          names[get_loc(term,0)] = String(++count);
+          kinds[get_loc(term,0)] = get_col(term);
+          lets[get_loc(term,0)] = get_loc(term,0);
+          find_lets(get_lnk(MEM, term, 2));
+        }
+        break;
+      }
+      case DP1: {
+        if (!lets[get_loc(term,0)]) {
+          names[get_loc(term,0)] = String(++count);
+          kinds[get_loc(term,0)] = get_col(term);
+          lets[get_loc(term,0)] = get_loc(term,0);
+          find_lets(get_lnk(MEM, term, 2));
+        }
+        break;
+      }
+      case CAL:
+      case CTR: {
+        var arity = get_ari(term);
+        for (var i = 0; i < arity; ++i) {
+          find_lets(get_lnk(MEM, term,i));
+        }
+        break;
+      }
+      case OP2: {
+        find_lets(get_lnk(MEM, term, 0));
+        find_lets(get_lnk(MEM, term, 1));
+        break;
+      }
+    }
+  }
+  function go(term: Lnk) : string {
+    switch (get_tag(term)) {
+      case LAM: {
+        var name = "x" + (names[get_loc(term,0)] || "?");
+        return "λ" + name + " " + go(get_lnk(MEM, term, 1));
+      }
+      case APP: {
+        let func = go(get_lnk(MEM, term, 0));
+        let argm = go(get_lnk(MEM, term, 1));
+        return "(" + func + " " + argm + ")";
+      }
+      case PAR: {
+        let kind = get_col(term);
+        let func = go(get_lnk(MEM, term, 0));
+        let argm = go(get_lnk(MEM, term, 1));
+        return "&" + kind + "<" + func + " " + argm + ">";
+      }
+      case CAL:
+      case CTR: {
+        let func = get_fun(term);
+        let arit = get_ari(term);
+        let args = [];
+        for (let i = 0; i < arit; ++i) {
+          args.push(go(get_lnk(MEM, term, i)));
+        }
+        if (table && table[func]) {
+          return "(" + table[func] + args.map(x => " " + x).join("") + ")";
+        } else {
+          return "(F" + func + args.map(x => " " + x).join("") + ")";
+        }
+      }
+      case DP0: {
+        return "a" + (names[get_loc(term,0)] || "?");
+      }
+      case DP1: {
+        return "b" + (names[get_loc(term,0)] || "?");
+      }
+      case VAR: {
+        return "x" + (names[get_loc(term,0)] || "?");
+      }
+      case OP2: {
+        let oper = get_ope(term);
+        let val0 = go(get_lnk(MEM, term, 0));
+        let val1 = go(get_lnk(MEM, term, 1));
+        return "#{" + oper + " " + val0 + " " + val1 + "}";
+      }
+      case U32: {
+        return "#" + get_num(term);
+      }
+    }
+    return "<?" + term + ">";
+  }
+  find_lets(term);
+  var text = go(term);
+  for (var key of Object.keys(lets).reverse()) {
+    var pos  = lets[key];
+    var kind = kinds[key] || 0;
+    var name = names[pos] || "?";
+    var nam0 = deref(MEM, pos+0) === Nil() ? "*" : "a"+name;
+    var nam1 = deref(MEM, pos+1) === Nil() ? "*" : "b"+name;
+    text += " !" + kind + "<"+nam0+" "+nam1+"> = " + go(deref(MEM, pos + 2)) + ";";
+  }
+  //text += go(term);
+  return text;
 }
