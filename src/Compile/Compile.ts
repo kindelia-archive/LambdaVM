@@ -6,7 +6,7 @@ import * as L from "https://raw.githubusercontent.com/Kindelia/Lambolt/master/sr
 
 // Compiles a Lambolt file to a target language.
 export function compile(file: L.File, target: string, template: string) {
-  console.log("compiling file");
+  console.log("Compiling file...");
 
   // Generates the name table.
   var name_table = gen_name_table(file);

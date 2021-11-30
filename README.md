@@ -25,7 +25,7 @@ A next-gen, massively parallel, beta-optimal functional runtime.
     (double (zero))   = (zero)
     (double (succ x)) = (succ (succ (double x)))
 
-    // Computes 2 * 2
+    // Computes 3 * 3
     (main) = (double (succ (succ (succ (zero)))))
     ```
 
