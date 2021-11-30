@@ -63,7 +63,7 @@ export function compile_group(
     for (var {rule,uses} of rules) {
       if (rule.lhs.$ === "Ctr") {
         for (var i = 0; i < rule.lhs.args.length; ++i) {
-          if (rule.lhs.args[i].$ === "Ctr") {
+          if (rule.lhs.args[i].$ === "Ctr" || rule.lhs.args[i].$ === "U32") {
             reduce_at[i] = true;
           }
         }

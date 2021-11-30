@@ -5,4 +5,4 @@
   let rec = λx [x (slow n)]
   [[rec λx x] [rec λx x]]
 
-(main) = [(slow (S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(Z)))))))))))))))))))))))))))))) (0)]
+(main) = [(slow (S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(Z)))))))))))))))))))))))))))))) (42)]
