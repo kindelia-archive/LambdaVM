@@ -2,14 +2,10 @@
 
 data N = Z | S N
 
-slow :: N -> (forall a . a -> a)
-
-slow Z =
-  \x -> x
-
+slow Z     = 1
 slow (S n) =
-  let rec = \x -> (x (slow n))
-  in ((rec (\x -> x)) (rec (\x -> x)))
+  let k = \x -> x (slow n)
+  in k (\x->x) + k (\x->x)
 
 main :: IO ()
-main = print ((slow (S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(Z)))))))))))))))))))))))))))))) 42)
+main = print (slow (S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(Z))))))))))))))))))))))))))))))
