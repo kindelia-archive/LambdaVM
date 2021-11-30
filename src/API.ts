@@ -113,6 +113,7 @@ export async function run(code: string, opts: any) {
   // ----------------
 
   if (normal !== null) {
+    console.log("Running...");
     var gas = normal(mem, 0);
     console.log(Convert.runtime_to_lambolt(mem, Runtime.deref(mem,0), numb_table));
     console.log("");
