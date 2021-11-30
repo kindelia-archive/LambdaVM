@@ -260,10 +260,12 @@ export function collect(MEM: Mem, term: Lnk) {
     }
     case DP0: {
       link(MEM, get_loc(term,0), Nil());
+      reduce(MEM, get_loc(get_lnk(MEM,term,1),0));
       break;
     }
     case DP1: {
       link(MEM, get_loc(term,1), Nil());
+      reduce(MEM, get_loc(get_lnk(MEM,term,0),0));
       break;
     }
     case CAL:
@@ -305,7 +307,6 @@ export function reduce(MEM: Mem, host: number) : Lnk {
   while (true) {
 
     var term = deref(MEM, host);
-    //console.log("?", G.show_term(MEM,term));
 
     switch (get_tag(term)) {
       case APP: {
@@ -640,5 +641,3 @@ function normal_go(MEM: Mem, host: number, seen: MAP<boolean>) : Lnk {
     }
   }
 }
-
-

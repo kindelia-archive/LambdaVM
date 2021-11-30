@@ -231,6 +231,7 @@ void clear(Mem* mem, u64 loc, u64 size) {
 // Garbage Collection
 // ------------------
 
+Lnk reduce(Mem* MEM, u64 host);
 void collect(Mem* mem, Lnk term) {
   switch (get_tag(term)) {
     case LAM: {
@@ -255,10 +256,12 @@ void collect(Mem* mem, Lnk term) {
     }
     case DP0: {
       link(mem, get_loc(term,0), Nil());
+      reduce(mem, get_loc(get_lnk(mem,term,1),0));
       break;
     }
     case DP1: {
       link(mem, get_loc(term,1), Nil());
+      reduce(mem, get_loc(get_lnk(mem,term,0),0));
       break;
     }
     case CAL:
