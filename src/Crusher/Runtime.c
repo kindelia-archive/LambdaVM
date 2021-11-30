@@ -18,7 +18,10 @@ const u8 DP1 = 5;
 const u8 VAR = 6;
 const u8 ARG = 7;
 const u8 CTR = 8;
-const u8 CAL = 9;
+
+//GENERATED_CONSTRUCTOR_IDS_START//
+//GENERATED_CONSTRUCTOR_IDS//
+//GENERATED_CONSTRUCTOR_IDS_END//
 
 typedef u64 Lnk;
 
@@ -124,10 +127,6 @@ Lnk Ctr(u64 fun, u64 ari, u64 pos) {
   return CTR | (fun << 4) | (ari << 20) | (pos << 24);
 }
 
-Lnk Cal(u64 fun, u64 ari, u64 pos) {
-  return CAL | (fun << 4) | (ari << 20) | (pos << 24);
-}
-
 u64 get_tag(Lnk lnk) {
   return lnk & 0xF;
 }
@@ -222,8 +221,7 @@ void collect(Mem* mem, Lnk term) {
       link(mem, get_loc(term,1), Nil());
       break;
     }
-    case CTR:
-    case CAL: {
+    case CTR: {
       u64 arity = get_ari(term);
       for (u64 i = 0; i < arity; ++i) {
         collect(mem, get_lnk(mem,term,i));
@@ -388,13 +386,13 @@ Lnk reduce(Mem* MEM, u64 host) {
         break;
       }
 
-      case CAL: {
+      case CTR: {
         switch (get_fun(term))
-        // START GENERATED CODE
+        //GENERATED_REWRITE_RULES_START//
         {
-//GENERATED_CODE//
+//GENERATED_REWRITE_RULES//
         }
-        // END GENERATED CODE
+        //GENERATED_REWRITE_RULES_END//
       }
 
     }
@@ -443,13 +441,6 @@ Lnk normal_cont(Mem* MEM, u64 host, u64* seen) {
       }
       case DP1: {
         link(MEM, get_loc(term,2), normal_cont(MEM, get_loc(term,2), seen));
-        return term;
-      }
-      case CAL: {
-        u64 arity = (u64)get_ari(term);
-        for (u64 i = 0; i < arity; ++i) {
-          link(MEM, get_loc(term,i), normal_cont(MEM, get_loc(term,i), seen));
-        }
         return term;
       }
       case CTR: {

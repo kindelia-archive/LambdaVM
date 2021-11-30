@@ -10,7 +10,6 @@ export type MAP<T> = Record<string, T>;
 // VAR: {tag: U4, pos: U28 | U40}
 // ARG: {tag: U4, pos: U28 | U40}
 // CTR: {tag: U4, fun: U16, ari: U4, pos: U28 | U40}
-// CAL: {tag: U4, fun: U16, ari: U4, pos: U28 | U40}
 // NUM: {tag: U4, val: U32}
 
 export const NIL : number = 0
@@ -22,8 +21,11 @@ export const DP1 : number = 5
 export const VAR : number = 6
 export const ARG : number = 7
 export const CTR : number = 8
-export const CAL : number = 9
-export const NUM : number = 10
+export const NUM : number = 9
+
+//GENERATED_CONSTRUCTOR_IDS_START//
+//GENERATED_CONSTRUCTOR_IDS//
+//GENERATED_CONSTRUCTOR_IDS_END//
 
 export type Lnk = number // U52 in JS, U64 in C
 
@@ -102,10 +104,6 @@ export function Arg(pos: number) : Lnk {
 
 export function Ctr(fun: number, ari: number, pos: number) {
   return CTR + (fun * 0x10) + (ari * 0x100000) + (pos * 0x1000000);
-}
-
-export function Cal(fun: number, ari: number, pos: number) {
-  return CAL + (fun * 0x10) + (ari * 0x100000) + (pos * 0x1000000);
 }
 
 export function get_tag(lnk: Lnk) : number {
@@ -228,8 +226,7 @@ export function collect(MEM: Mem, term: Lnk) {
       link(MEM, get_loc(term,1), Nil());
       break;
     }
-    case CTR:
-    case CAL: {
+    case CTR: {
       var arity = get_ari(term);
       for (var i = 0; i < arity; ++i) {
         collect(MEM, get_lnk(MEM,term,i));
@@ -482,14 +479,14 @@ export function reduce(MEM: Mem, host: number) : Lnk {
         }
         break;
       }
-      case CAL: {
+      case CTR: {
         //console.log("call", get_ex0(term));
         switch (get_fun(term))
-        // START GENERATED CODE
+        //GENERATED_REWRITE_RULES_START//
         {
-//GENERATED_CODE//
+//GENERATED_REWRITE_RULES//
         }
-        // END GENERATED CODE
+        //GENERATED_REWRITE_RULES_END//
       }
       break;
     }
@@ -533,7 +530,6 @@ function normal_go(MEM: Mem, host: number, seen: MAP<boolean>) : Lnk {
         link(MEM, get_loc(term,2), normal_go(MEM, get_loc(term,2), seen));
         return term;
       }
-      case CAL:
       case CTR: {
         var arity = get_ari(term);
         for (var i = 0; i < arity; ++i) {

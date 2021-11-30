@@ -1,16 +1,265 @@
-import * as LB from "https://raw.githubusercontent.com/Kindelia/LamBolt/master/src/LamBolt.ts"
+import * as LB from "https://raw.githubusercontent.com/Kindelia/Lambolt/master/src/Lambolt.ts"
 
 // Compiler
 // --------
 
-function line(tab: number, text: string) {
-  for (var i = 0; i < tab; ++i) {
-    text = "  " + text;
+// Compiles a Lambolt file to a target language.
+export function compile(file: LB.File, target: string, template: string) {
+  console.log("compiling file");
+
+  // Generates the name table.
+  var name_table = gen_name_table(file);
+
+  // Groups the rules by name.
+  var groups = gen_groups(file);
+
+  // Compiles constructor ids.
+  var constructor_ids = "";
+  for (var name in name_table) {
+    constructor_ids += CONST(target) + " " + compile_constructor_name(name) + " = " + name_table[name] + ";\n";
   }
-  return text + "\n";
+
+  // Compiles each group's rewrite rules.
+  var rewrite_rules = "";
+  for (var group_name in groups) {
+    rewrite_rules += compile_group(group_name, groups[group_name][0], groups[group_name][1], name_table, target, 5);
+  }
+
+  //console.log(constructor_ids);
+  //console.log(rewrite_rules);
+
+  return template
+    .replace("//GENERATED_REWRITE_RULES//", rewrite_rules)
+    .replace("//GENERATED_CONSTRUCTOR_IDS//", constructor_ids);
 }
 
-export function sanitize(func: LB.Bond): LB.Bond {
+// Compiles a group of rules to the target language.
+export function compile_group(
+  name: string,
+  arity: number,
+  rules: Array<LB.Rule>,
+  name_table: {[name:string]:number},
+  target: string,
+  tab: number
+): string {
+  function compile_group(name: string, arity: number, rules: Array<{rule:LB.Rule,uses:{[key:string]:number}}>, tab: number) {
+    text += line(tab, "case " + compile_constructor_name(name) + ": {");
+
+    // Finds which arguments of the group need to be reduced. For example, here:
+    //   (add (succ a) b) = (succ (add a b))
+    //   (add (zero)   b) = b
+    // Only the first argument needs to be reduced. But here:
+    //   (add (succ a) (succ b)) = (succ (succ (add a b)))
+    //   (add (succ a) (zero)  ) = (succ a)
+    //   (add (zero)   (succ b)) = (succ b)
+    //   (add (zero)   (zero)  ) = (zero)
+    // Both arguments need to be reduced, since they're both constructors.
+    var reduce_at : {[key:string]:boolean} = {};
+    for (var {rule,uses} of rules) {
+      if (rule.lhs.$ === "Ctr") {
+        for (var i = 0; i < rule.lhs.args.length; ++i) {
+          if (rule.lhs.args[i].$ === "Ctr") {
+            reduce_at[i] = true;
+          }
+        }
+      }
+    }
+
+    // Creates a variable for the location and pointer of each argument.
+    //   (add (succ a) b) = (succ (add a b))
+    //   (add (zero)   b) = b
+    //        /\       /\
+    //        creates a loc and lnk for of each of these args
+    //        /\ 
+    //        reduces this arg
+    for (var i = 0; i < arity; ++i) {
+      text += line(tab+1, VAR(target) + " LOC_"+i+" = get_loc(term,"+i+");");
+    }
+    for (var i = 0; i < arity; ++i) {
+      if (reduce_at[i]) {
+        text += line(tab+1, VAR(target)+" LNK_"+i+" = reduce(MEM, LOC_"+i+");");
+      } else {
+        text += line(tab+1, VAR(target)+" LNK_"+i+" = get_arg(MEM, LOC_"+i+");");
+      }
+    }
+
+    // For each of the rules in this group...
+    for (var {rule,uses} of rules) {
+      if (rule.lhs.$ === "Ctr" && rule.lhs.args.length === arity) {
+
+        var clears = ["clear(MEM, get_loc(term, 0), "+rule.lhs.args.length+")"];
+        var collects = [];
+
+        // Checks if this rule matches and enters its branch. That is,
+        //   (add (succ a) b) = (succ (add a b))
+        //        /\ this rule will match if the first ctor's tag is SUCC
+        var conds = [];
+        for (var i = 0; i < arity; ++i) {
+          var term = rule.lhs.args[i];
+          if (term.$ === "Ctr") {
+            conds.push("get_fun(LNK_"+i+") == "+(compile_constructor_name(term.name)||"?"));
+          }
+        }
+        text += line(tab+1, "if ("+(conds.join(" && ") || "1")+") {");
+        text += line(tab+2, GAS(target)+";");
+
+        // We've matched! Great. Now, we must collect the variable names.
+        // For each argument in this rule...
+        for (var i = 0; i < arity; ++i) {
+          var term = rule.lhs.args[i];
+          switch (term.$) {
+            // If it is a constructor, link the name of each field to their locs and lnks. That is,
+            //   (add (succ a) b) = (succ (add a b))
+            //              /\ this is a constructor field, so here we'll create a loc and lnk for it!
+            case "Ctr": {
+              for (var j = 0; j < term.args.length; ++j) {
+                var field = term.args[j];
+                switch (field.$) {
+                  case "Var": {
+                    locs[field.name] = define("loc", "get_loc(LNK_"+i+", "+j+")", tab+2);
+                    args[field.name] = define("lnk", "get_lnk(MEM, LNK_"+i+", "+j+")", tab+2);
+                    if (!uses[field.name]) {
+                      collects.push(args[field.name]);
+                    }
+                    break;
+                  }
+                  default: {
+                    throw "Nested pattern-matches are not available yet. (Used on a rewrite-rule for '" + name + "'.)";
+                  }
+                }
+              }
+              clears.push("clear(MEM, get_loc(LNK_"+i+", 0), "+term.args.length+")");
+              break;
+            }
+            // If the argument is a variable, link its name to its loc and lnk. That is,
+            //   (add (succ a) b) = (succ (add a b))
+            //                 /\ this is a var, so here we'll create a loc and lnk for it!
+            case "Var": {
+              locs[term.name] = define("loc", "LOC_"+i, tab+2);
+              args[term.name] = define("lnk", "LNK_"+i, tab+2);
+              if (!uses[term.name]) {
+                collects.push(args[term.name]);
+              }
+              break;
+            }
+            // Otherwise, something is very wrong.
+            default: {
+              throw "Invalid left-hand side.";
+            }
+          }
+        }
+
+        // At this point, we've matched a rule and collected all the left-hand
+        // side variables. Great! Now we just need to compile the right-hand.
+        var done = compile_term(rule.rhs, tab+2);
+        text += line(tab+2, "link(MEM, host, " + done + ");"); 
+
+        // Now we free the nodes used in this rule.
+        for (var clear of clears) {
+          text += line(tab+2, clear + ";");
+        }
+
+        // Now we collect the variables that went out of scope.
+        for (var collect of collects) {
+          text += line(tab+2, "collect(MEM, " + collect + ");");
+        }
+
+        // And we're done! WP.
+        text += line(tab+2, "continue;");
+        text += line(tab+1, "}");
+      } else {
+        throw "Invalid left-hand side.";
+      }
+    }
+    text += line(tab+1, "break;");
+    text += line(tab, "}");
+  }
+
+  // Compiles a term (i.e., the right-hand side). It just allocates space for
+  // the term and creates the links.
+  function compile_term(term: LB.Term, tab: number) : string {
+    switch (term.$) {
+      case "Var":
+        return args[term.name] ? args[term.name] : "?";
+      case "Dup":
+        var name = fresh("dup");
+        var dupk = dups++;
+        text += line(tab, VAR(target) + " " + name + " = alloc(MEM, 3);");
+        args[term.nam0] = "Dp0(" + dupk + ", "+name+")"; // TODO
+        args[term.nam1] = "Dp1(" + dupk + ", "+name+")"; // TODO
+        var expr = compile_term(term.expr, tab);
+        text += line(tab, "link(MEM, "+name+"+2, "+expr+");");
+        var body = compile_term(term.body, tab);
+        return body;
+      case "Let":
+        var expr = compile_term(term.expr, tab);
+        args[term.name] = expr;
+        var body = compile_term(term.body, tab);
+        return body;
+      case "Lam":
+        var name = fresh("lam");
+        text += line(tab, VAR(target) + " " + name + " = alloc(MEM, 2);");
+        args[term.name] = "Var("+name+")";
+        var body = compile_term(term.body, tab);
+        text += line(tab, "link(MEM, " + name+"+1, " + body + ");");
+        return "Lam(" + name + ")";
+      case "App":
+        var name = fresh("app");
+        var func = compile_term(term.func, tab);
+        var argm = compile_term(term.argm, tab);
+        text += line(tab, VAR(target) + " " + name + " = alloc(MEM, 2);");
+        text += line(tab, "link(MEM, " + name+"+0, " + func + ");");
+        text += line(tab, "link(MEM, " + name+"+1, " + argm + ");");
+        return "App(" + name + ")";
+      case "Ctr":
+        var ctr_args : Array<string> = [];
+        for (var i = 0; i < term.args.length; ++i) {
+          ctr_args.push(compile_term(term.args[i], tab));
+        }
+        var name = fresh("ctr");
+        text += line(tab, VAR(target) + " " + name + " = alloc(MEM, " + ctr_args.length + ");");
+        for (var i = 0; i < ctr_args.length; ++i) {
+          text += line(tab, "link(MEM, " + name+"+"+i + ", " + ctr_args[i] + ");");
+        }
+        return "Ctr(" + (compile_constructor_name(term.name)||0) + ", " + ctr_args.length + ", " + name + ")";
+    }
+  }
+
+  // Associates an expression with a fresh name.
+  function define(prefix: string, expr: string, tab: number) : string {
+    var name = fresh(prefix);
+    text += line(tab, VAR(target) + " " + name + " = " + expr + ";");
+    return name;
+  }
+
+  // Generates a fresh name.
+  function fresh(prefix: string) : string {
+    return prefix + "$" + (size++);
+  }
+
+  var locs : {[name: string]: string} = {};
+  var args : {[name: string]: string} = {};
+  var uses : {[name: string]: number} = {};
+  var dups = 0;
+  var text = "";
+  var size = 0;
+  compile_group(name, arity, rules.map(sanitize), tab);
+  return text;
+}
+
+// Compiles a constructor name
+function compile_constructor_name(name: string) {
+  return "$"+name.toUpperCase();
+}
+
+// This big function sanitizes a rule. That is, it renames every variable in a
+// rule, in order to make it unique. Moreover, it will also add a `.N` to the
+// end of the name of each variable used in the right-hand side of the rule,
+// where `N` stands for the number of times it was used. For example:
+//   sanitize `(fn (cons head tail)) = (cons (pair head head) tail)`
+//         ~> `(fn (cons x0   x1))   = (cons (pair x0.0 x0.1) x1.0)`
+// It also returns the usage count of each variable.
+export function sanitize(rule: LB.Rule): {rule: LB.Rule, uses: {[key:string]:number}} {
   var size = 0;
   var uses : {[key:string]: number} = {};
   function fresh() : string {
@@ -40,265 +289,201 @@ export function sanitize(func: LB.Bond): LB.Bond {
     }
   }
 
-  function sanitize_bond(bond: LB.Bond): LB.Bond {
-    var name = bond.name;
+  function create_fresh(rule: LB.Rule): {[key:string]: string} {
     var table : {[key:string]:string} = {};
-    for (var arg_name of bond.args) {
-      table[arg_name] = fresh();
-    }
-    var args = bond.args.map(x => table[x] || x);
-    var body = sanitize_match(bond.body, table, args);
-    return LB.Bond(name, args, body);
-  }
-
-  function sanitize_match(match: LB.Match, table: {[key:string]:string}, must_copy: string[]): LB.Match {
-    switch (match.$) {
-      case "Case": {
-        let expr = table[match.expr] || match.expr;
-        let cses : Array<{name: string, args: Array<string>, body: LB.Match}> = match.cses.map((cse) => {
-          let name : string = cse.name;
-          let args : Array<string> = cse.args;
-          let body : LB.Match = cse.body;
-          let new_table = {...table};
-          for (let arg of args) {
-            new_table[arg] = fresh();
+    switch (rule.lhs.$) {
+      case "Ctr": {
+        var name = rule.lhs.name;
+        var new_rule = [];
+        for (var arg of rule.lhs.args) {
+          switch (arg.$) {
+            case "Var": {
+              table[arg.name] = fresh();
+              break;
+            }
+            case "Ctr": {
+              for (var field of arg.args) {
+                switch (field.$) {
+                  case "Var": {
+                    table[field.name] = fresh();
+                    break;
+                  }
+                  default: {
+                    throw "Invalid left-hand side.";
+                  }
+                }
+              }
+              break;
+            }
+            default: {
+              throw "Invalid left-hand side.";
+            }
           }
-          let new_args = args.map(x => new_table[x] || x);
-          let new_body = sanitize_match(body, new_table, must_copy.concat(new_args));
-          return {name, args: new_args, body: new_body};
-        })
-        return LB.Case(expr, cses);
-      }
-      case "Body": {
-        let expr = sanitize_term(match.expr, table); 
-        for (var arg of must_copy) {
-          expr = duplicator(arg, LB.Var(arg), expr);
         }
-        return LB.Body(expr);
+        break;
+      }
+      default: {
+        throw "Invalid left-hand side.";
       }
     }
+    return table;
   }
 
-  function sanitize_term(term: LB.Term, table: {[key:string]:string}): LB.Term {
+  function sanitize_term(term: LB.Term, table: {[key:string]:string}, lhs: boolean): LB.Term {
     switch (term.$) {
       case "Var": {
-        if (table[term.name]) {
-          var used = uses[table[term.name]] || 0;
-          var name = table[term.name] + "." + used;
-          uses[table[term.name]] = used + 1;
-          return LB.Var(name);
+        if (lhs) {
+          return LB.Var(table[term.name] || term.name);
         } else {
-          throw "Error: unbound variable '" + term.name + "'.";
+          if (table[term.name]) {
+            var used = uses[table[term.name]] || 0;
+            var name = table[term.name] + "." + used;
+            uses[table[term.name]] = used + 1;
+            return LB.Var(name);
+          } else {
+            throw "Error: unbound variable '" + term.name + "'.";
+          }
         }
       }
       case "Dup": {
         let nam0 = fresh();
         let nam1 = fresh();
-        let expr = sanitize_term(term.expr, table);
-        let body = sanitize_term(term.body, {...table, [term.nam0]: nam0, [term.nam1]: nam1});
+        let expr = sanitize_term(term.expr, table, lhs);
+        let body = sanitize_term(term.body, {...table, [term.nam0]: nam0, [term.nam1]: nam1}, lhs);
         return LB.Dup(nam0+".0", nam1+".0", expr, body);
       }
       case "Let": {
         let name = fresh();
-        let expr = sanitize_term(term.expr, table);
-        let body = sanitize_term(term.body, {...table, [term.name]: name});
+        let expr = sanitize_term(term.expr, table, lhs);
+        let body = sanitize_term(term.body, {...table, [term.name]: name}, lhs);
         var used = uses[name] || 0;
         return duplicator(name, expr, body);
       }
       case "Lam": {
         let name = fresh();
-        let body = sanitize_term(term.body, {...table, [term.name]: name});
+        let body = sanitize_term(term.body, {...table, [term.name]: name}, lhs);
         var used = uses[name] || 0;
         return LB.Lam(name, duplicator(name, LB.Var(name), body));
       }
       case "App": {
-        let func = sanitize_term(term.func, table);
-        let argm = sanitize_term(term.argm, table);
+        let func = sanitize_term(term.func, table, lhs);
+        let argm = sanitize_term(term.argm, table, lhs);
         return LB.App(func, argm);
       }
       case "Ctr": {
         let name = term.name;
-        let args = term.args.map(x => sanitize_term(x,table));
+        let args = term.args.map(x => sanitize_term(x,table, lhs));
         return LB.Ctr(name, args);
       }
-      case "Cal": {
-        let func = term.func;
-        let args = term.args.map(x => sanitize_term(x, table));
-        return LB.Cal(func, args);
+    }
+  }
+
+  var table = create_fresh(rule);
+  var lhs = sanitize_term(rule.lhs, {...table}, true);
+  var rhs = sanitize_term(rule.rhs, {...table}, false);
+  for (var key in table) {
+    rhs = duplicator(table[key], LB.Var(table[key]), rhs);
+  }
+  var rule = LB.Rule(lhs, rhs);
+  return {rule, uses};
+}
+
+// Generates a name table for a whole program. That table links constructor
+// names (such as `cons` and `succ`) to small ids (such as `0` and `1`).
+export function gen_name_table(file: LB.File) : {[name: string]: number} {
+  var table : {[name: string]: number} = {};
+  var fresh : number = 0;
+  function find_ctrs(term: LB.Term) {
+    switch (term.$) {
+      case "Var": {
+        break;
+      }
+      case "Dup": {
+        find_ctrs(term.expr);
+        find_ctrs(term.body);
+        break;
+      }
+      case "Let": {
+        find_ctrs(term.expr);
+        find_ctrs(term.body);
+        break;
+      }
+      case "Lam": {
+        find_ctrs(term.body);
+        break;
+      }
+      case "App": {
+        find_ctrs(term.func);
+        find_ctrs(term.argm);
+        break;
+      }
+      case "Ctr": {
+        if (table[term.name] === undefined) {
+          table[term.name] = fresh++;
+        }
+        for (var arg of term.args) {
+          find_ctrs(arg);
+        }
+        break;
       }
     }
   }
-
-  return sanitize_bond(func);
-}
-
-export function compile_bond(func: LB.Bond, table: {[name:string]:number}, target: string, tab: number): string {
-  if (target === "ts") {
-    var VAR = "var"; 
-    var GAS = "++GAS";
-  } else if (target === "c") {
-    var VAR = "u64";
-    var GAS = "inc_gas(MEM)";
-  } else {
-    throw "Unknown target: " + target;
-  }
-  
-  function compile_bond(bond: LB.Bond, tab: number) {
-    text += line(tab, "case " + table[bond.name] + ": {");
-    for (var i = 0; i < bond.args.length; ++i) {
-      locs[bond.args[i]] = define("loc", "get_loc(term, "+i+")", tab+1);
-      args[bond.args[i]] = define("arg", "get_lnk(MEM, term, "+i+")", tab+1);
-    }
-    var clear = ["clear(MEM, get_loc(term, 0), "+bond.args.length+")"];
-    compile_match(bond.body, clear, tab + 1)
-    //text += line(tab+1, "break;");
-    text += line(tab, "}");
-  }
-
-  function compile_match(match: LB.Match, clear: Array<string>, tab: number) {
-    switch (match.$) {
-      case "Case":
-        var expr_name = locs[match.expr] || "";
-        text += line(tab, VAR+" " + expr_name + "$ = reduce(MEM, " + expr_name + ");");
-        text += line(tab, "switch (get_tag("+expr_name+"$) == CTR ? get_fun(" + expr_name + "$) : -1) {");
-        for (var i = 0; i < match.cses.length; ++i) {
-          var cse = match.cses[i];
-          text += line(tab+1, "case " + (table[cse.name]||0) + ": {");
-          for (var j = 0; j < cse.args.length; ++j) {
-            locs[cse.args[j]] = define("fld_loc", "get_loc("+expr_name+"$, "+j+")", tab + 2);
-            args[cse.args[j]] = define("fld_arg", "get_lnk(MEM, "+expr_name+"$, "+j+")", tab + 2);
-          }
-          var cse_clear = ["clear(MEM, get_loc("+expr_name+"$, 0), "+cse.args.length+")"].concat(clear);
-          compile_match(cse.body, cse_clear, tab + 2);
-          text += line(tab+1, "}");
-        }
-        text += line(tab, "}");
-        break;
-      case "Body":
-        if (GAS) {
-          text += line(tab, GAS+";");
-        }
-        var done = compile_term(match.expr, tab);
-        text += line(tab, "link(MEM, host, " + done + ");"); 
-        for (var eraser of clear) {
-          text += line(tab, eraser + ";");
-        }
-        text += line(tab, "continue;");
-        break;
-    }
-  }
-
-  function compile_term(term: LB.Term, tab: number) : string {
-    switch (term.$) {
-      case "Var":
-        return args[term.name] ? args[term.name] : "?";
-      case "Dup":
-        var name = fresh("dup");
-        var dupk = dups++;
-        text += line(tab, VAR + " " + name + " = alloc(MEM, 3);");
-        args[term.nam0] = "Dp0(" + dupk + ", "+name+")"; // TODO
-        args[term.nam1] = "Dp1(" + dupk + ", "+name+")"; // TODO
-        var expr = compile_term(term.expr, tab);
-        text += line(tab, "link(MEM, "+name+"+2, "+expr+");");
-        var body = compile_term(term.body, tab);
-        return body;
-      case "Let":
-        var expr = compile_term(term.expr, tab);
-        args[term.name] = expr;
-        var body = compile_term(term.body, tab);
-        return body;
-      case "Lam":
-        var name = fresh("lam");
-        text += line(tab, VAR + " " + name + " = alloc(MEM, 2);");
-        args[term.name] = "Var("+name+")";
-        var body = compile_term(term.body, tab);
-        text += line(tab, "link(MEM, " + name+"+1, " + body + ");");
-        return "Lam(" + name + ")";
-      case "App":
-        var name = fresh("app");
-        var func = compile_term(term.func, tab);
-        var argm = compile_term(term.argm, tab);
-        text += line(tab, VAR + " " + name + " = alloc(MEM, 2);");
-        text += line(tab, "link(MEM, " + name+"+0, " + func + ");");
-        text += line(tab, "link(MEM, " + name+"+1, " + argm + ");");
-        return "App(" + name + ")";
-      case "Ctr":
-        var ctr_args : Array<string> = [];
-        for (var i = 0; i < term.args.length; ++i) {
-          ctr_args.push(compile_term(term.args[i], tab));
-        }
-        var name = fresh("ctr");
-        text += line(tab, VAR + " " + name + " = alloc(MEM, " + ctr_args.length + ");");
-        for (var i = 0; i < ctr_args.length; ++i) {
-          text += line(tab, "link(MEM, " + name+"+"+i + ", " + ctr_args[i] + ");");
-        }
-        return "Ctr(" + (table[term.name]||0) + ", " + ctr_args.length + ", " + name + ")";
-      case "Cal":
-        var cal_args : Array<string> = [];
-        for (var i = 0; i < term.args.length; ++i) {
-          cal_args.push(compile_term(term.args[i], tab));
-        }
-        //console.log("cal_args:", cal_args);
-        var name = fresh("cal");
-        text += line(tab, VAR + " " + name + " = alloc(MEM, " + cal_args.length + ");");
-        for (var i = 0; i < cal_args.length; ++i) {
-          text += line(tab, "link(MEM, " + name+"+"+i + ", " + cal_args[i] + ");");
-        }
-        return "Cal(" + (table[term.func]||0) + ", " + cal_args.length + ", " + name + ")";
-    }
-  }
-
-  function fresh(prefix: string) : string {
-    return prefix + "$" + (size++);
-  }
-
-  function define(prefix: string, expr: string, tab: number) : string {
-    var name = fresh(prefix);
-    text += line(tab, VAR + " " + name + " = " + expr + ";");
-    return name;
-  }
-
-  var locs : {[name: string]: string} = {};
-  var args : {[name: string]: string} = {};
-  var uses : {[name: string]: number} = {};
-  var dups = 0;
-  var text = "";
-  var size = 0;
-  //compile_func(func, tab);
-  compile_bond(sanitize(func), tab);
-  return text;
-}
-
-export function gen_name_table(file: LB.File) : {[name: string]: number} {
-  var table : {[name: string]: number} = {};
-  var fresh = 0;
-  for (var i = 0; i < file.defs.length; ++i) {
-    var def = file.defs[i];
-    switch (def.$) {
-      case "NewBond":
-        table[def.bond.name] = ++fresh;
-        break;
-      case "NewType":
-        for (var ctr of def.type.ctrs) {
-          table[ctr.name] = ++fresh;
-        }
-        break;
-    }
+  for (var rule of file) {
+    find_ctrs(rule.lhs);
+    find_ctrs(rule.rhs);
   }
   return table;
 }
 
-export function compile(file: LB.File, target: string) {
-  var table = gen_name_table(file);
-
-  var code = "";
-  for (var def of file.defs) {
-    switch (def.$) {
-      case "NewBond":
-        code += compile_bond(def.bond, table, target, 5);
-        break;
+// Groups rules by name. For example:
+//   (add (succ a) (succ b)) = (succ (succ (add a b)))
+//   (add (succ a) (zero)  ) = (succ a)
+//   (add (zero)   (succ b)) = (succ b)
+//   (add (zero)   (zero)  ) = (zero)
+// This is a group of 4 rules starting with the "add" name.
+export function gen_groups(file: LB.File): {[key: string]: [number, Array<LB.Rule>]} {
+  var groups : {[key: string]: [number, Array<LB.Rule>]} = {};
+  for (var rule of file) {
+    if (rule.lhs.$ === "Ctr") {
+      if (!groups[rule.lhs.name]) {
+        groups[rule.lhs.name] = [rule.lhs.args.length, [rule]];
+      } else if (groups[rule.lhs.name][0] === rule.lhs.args.length) {
+        groups[rule.lhs.name][1].push(rule);
+      } else {
+        throw "Rewrite rules for '" + rule.lhs.name + "' have different argument counts.";
+      }
+    } else {
+      throw "Invalid left-hand side.";
     }
   }
+  return groups;
+}
 
-  return code;
+// Creates a new line with an amount of tabs.
+function line(tab: number, text: string) {
+  for (var i = 0; i < tab; ++i) {
+    text = "  " + text;
+  }
+  return text + "\n";
+}
+
+function CONST(target: string) {
+  switch (target) {
+    case "ts": return "const";
+    case "c": return "const u64";
+  }
+}
+
+function VAR(target: string) {
+  switch (target) {
+    case "ts": return "var";
+    case "c": return "u64";
+  }
+}
+
+function GAS(target: string) {
+  switch (target) {
+    case "ts": return "++GAS";
+    case "c": return "inc_gas(MEM)";
+  }
 }

@@ -1,17 +1,6 @@
-type Nat {
-  zero{}
-  succ{pred}
-}
+// Doubles a natural number
+(double (zero))   = (zero)
+(double (succ x)) = (succ (succ (double x)))
 
-bond double(n) {
-  case n {
-    zero{}:
-      zero{}
-    succ{pred}:
-      succ{succ{double(pred)}}
-  }
-}
-
-bond main() {
-  double(succ{succ{zero{}}})
-}
+// Computes 2 * 2
+(main) = (double (succ (succ (succ (zero)))))

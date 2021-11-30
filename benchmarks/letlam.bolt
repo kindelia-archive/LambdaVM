@@ -1,0 +1,8 @@
+(slow (Z)) =
+  λx x
+
+(slow (S n)) =
+  let rec = λx [x (slow n)]
+  [[rec λx x] [rec λx x]]
+
+(main) = [(slow (S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(S(Z)))))))))))))))))))))))))))))) (0)]

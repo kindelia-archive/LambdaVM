@@ -1,5 +1,5 @@
 import * as C from "./../Crusher/Language.ts"
-import * as LB from "https://raw.githubusercontent.com/Kindelia/LamBolt/master/src/LamBolt.ts"
+import * as LB from "https://raw.githubusercontent.com/Kindelia/Lambolt/master/src/Lambolt.ts"
 
 export function lambolt_to_crusher(term: LB.Term, table: {[name:string]:number}): string {
   var vars = 0;
@@ -108,38 +108,38 @@ export function crusher_to_lambolt(MEM: C.Mem, input_term: C.Lnk | null = null, 
     if (!seen[term]) {
       seen[term] = true;
       switch (C.get_tag(term)) {
-        case C.LAM:
+        case C.LAM: {
           if (C.get_tag(C.get_lnk(MEM, term, 0)) !== C.NIL) {
             names[C.Var(C.get_loc(term,0))] = "x" + (++count);
           }
           name(C.get_lnk(MEM, term, 1), depth + 1);
           break;
-        case C.APP:
+        }
+        case C.APP: {
           name(C.get_lnk(MEM, term, 0), depth + 1);
           name(C.get_lnk(MEM, term, 1), depth + 1);
           break;
-        case C.PAR:
+        }
+        case C.PAR: {
           name(C.get_lnk(MEM, term, 0), depth + 1);
           name(C.get_lnk(MEM, term, 1), depth + 1);
           break;
-        case C.DP0:
+        }
+        case C.DP0: {
           name(C.get_lnk(MEM, term, 2), depth + 1);
           break;
-        case C.DP1:
+        }
+        case C.DP1: {
           name(C.get_lnk(MEM, term, 2), depth + 1);
           break;
-        case C.CTR:
+        }
+        case C.CTR: {
           var arity = C.get_ari(term);
           for (var i = 0; i < arity; ++i) {
             name(C.get_lnk(MEM, term, i), depth + 1);
           }
           break;
-        case C.CAL:
-          var arity = C.get_ari(term);
-          for (var i = 0; i < arity; ++i) {
-            name(C.get_lnk(MEM, term, i), depth + 1);
-          }
-          break;
+        }
       }
     }
   }
@@ -162,7 +162,7 @@ export function crusher_to_lambolt(MEM: C.Mem, input_term: C.Lnk | null = null, 
         case C.APP: {
           let func = go(C.get_lnk(MEM, term, 0), stacks, seen, depth + 1);
           let argm = go(C.get_lnk(MEM, term, 1), stacks, seen, depth + 1);
-          return "(" + func + " " + argm + ")"
+          return "[" + func + " " + argm + "]"
         }
         case C.PAR: {
           let col = C.get_col(term);
@@ -197,17 +197,7 @@ export function crusher_to_lambolt(MEM: C.Mem, input_term: C.Lnk | null = null, 
             args.push(go(C.get_lnk(MEM, term, i), stacks, seen, depth + 1));
           }
           var name = table[func] || ("$" + String(func));
-          return name+ "{" + args.join(" ") + "}";
-        }
-        case C.CAL: {
-          let func = C.get_fun(term);
-          var arit = C.get_ari(term);
-          let args = [];
-          for (let i = 0; i < arit; ++i) {
-            args.push(go(C.get_lnk(MEM, term, i), stacks, seen, depth + 1));
-          }
-          var name = table[func] || ("@" + String(func));
-          return name + "(" + args.join(" ") + ")";
+          return "(" + name + args.map(x => " " + x).join("") + ")";
         }
         case C.VAR: {
           return names[term] || "^"+String(C.get_loc(term,0)) + "<" + C.show_lnk(C.deref(MEM, C.get_loc(term,0))) + ">";

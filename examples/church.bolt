@@ -1,9 +1,7 @@
 // Doubles using Church-Encoding
-bond main() {
+(main) =
   let zero = λs λz z
-  let succ = λn λs λz (s (n s z))
-  let mul2 = λa (a λp (succ (succ p)) zero)
-  let num2 = λsucc λzero (succ (succ zero))
-  (mul2 num2)
-}
-
+  let succ = λn λs λz [s [n s z]]
+  let mul2 = λa [a λp [succ [succ p]] zero]
+  let num2 = λsucc λzero [succ [succ zero]]
+  [mul2 num2]

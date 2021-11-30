@@ -1,6 +1,6 @@
 // Importing a dylib on TypeScript
 
-import * as Lambolt from "https://raw.githubusercontent.com/Kindelia/LamBolt/master/src/LamBolt.ts"
+import * as Lambolt from "https://raw.githubusercontent.com/Kindelia/Lambolt/master/src/Lambolt.ts"
 import * as Crusher from "./Crusher/Language.ts"
 import * as Compile from "./Compile/Compile.ts"
 import * as Convert from "./Compile/Convert.ts"
@@ -14,11 +14,11 @@ function dylib_suffix() {
 }
 
 async function build_runtime(file: Lambolt.File, target: string) {
-  var comp = Compile.compile(file, target);
-  var srcp = new URL("./Crusher/Runtime."+target, import.meta.url);
-  var trgp = new URL("./../bin/Runtime."+target, import.meta.url);
-  var code = (await Deno.readTextFile(srcp)).replace("//GENERATED_CODE//", comp);
-  await Deno.writeTextFileSync(trgp, code);
+  var source_path = new URL("./Crusher/Runtime."+target, import.meta.url);
+  var target_path = new URL("./../bin/Runtime."+target, import.meta.url);
+  var source_code = await Deno.readTextFile(source_path);
+  var target_code = Compile.compile(file, target, source_code);
+  await Deno.writeTextFileSync(target_path, target_code);
 }
 
 async function compile_c_dylib() {
@@ -76,8 +76,8 @@ export async function run(code: string, opts: any) {
   
   var file = Lambolt.read(Lambolt.parse_file, code);
   //console.log(Lambolt.show_file(file));
-  var main = file.defs[file.defs.length - 1];
-  if (!(main && main.$ === "NewBond" && main.bond.name === "main" && main.bond.body.$ === "Body")) {
+  var main = file[file.length - 1];
+  if (!(main && main.$ === "Rule" && main.lhs.$ === "Ctr" && main.lhs.name === "main" && main.lhs.args.length === 0)) {
     throw "Main not found.";
   }
   var name_table = Compile.gen_name_table(file);
@@ -110,7 +110,7 @@ export async function run(code: string, opts: any) {
     var mem = Crusher.read_term(code);
   } else {
     var mem = Crusher.init();
-    Crusher.link(mem, 0, Crusher.Cal(name_table["main"] || 0, 0, 0));
+    Crusher.link(mem, 0, Crusher.Ctr(name_table["main"] || 0, 0, 0));
   }
 
   // Evaluates main()

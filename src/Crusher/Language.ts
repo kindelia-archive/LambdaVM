@@ -25,7 +25,6 @@ export function show_tag(tag: number) {
     case K.ARG: return "ARG";
     case K.NIL: return "NIL";
     case K.CTR: return "CTR";
-    case K.CAL: return "CAL";
   }
 }
 
@@ -51,19 +50,22 @@ export function show_term(MEM: K.Mem, term: K.Lnk) : string {
   var count = 0;
   function find_lets(term: K.Lnk) {
     switch (K.get_tag(term)) {
-      case K.LAM:
+      case K.LAM: {
         names[K.get_loc(term,0)] = String(++count);
         find_lets(K.get_lnk(MEM, term, 1));
         break;
-      case K.APP:
+      }
+      case K.APP: {
         find_lets(K.get_lnk(MEM, term, 0));
         find_lets(K.get_lnk(MEM, term, 1));
         break;
-      case K.PAR:
+      }
+      case K.PAR: {
         find_lets(K.get_lnk(MEM, term, 0));
         find_lets(K.get_lnk(MEM, term, 1));
         break;
-      case K.DP0:
+      }
+      case K.DP0: {
         if (!lets[K.get_loc(term,0)]) {
           names[K.get_loc(term,0)] = String(++count);
           kinds[K.get_loc(term,0)] = K.get_col(term);
@@ -71,7 +73,8 @@ export function show_term(MEM: K.Mem, term: K.Lnk) : string {
           find_lets(K.get_lnk(MEM, term, 2));
         }
         break;
-      case K.DP1:
+      }
+      case K.DP1: {
         if (!lets[K.get_loc(term,0)]) {
           names[K.get_loc(term,0)] = String(++count);
           kinds[K.get_loc(term,0)] = K.get_col(term);
@@ -79,13 +82,14 @@ export function show_term(MEM: K.Mem, term: K.Lnk) : string {
           find_lets(K.get_lnk(MEM, term, 2));
         }
         break;
-      case K.CTR:
-      case K.CAL:
+      }
+      case K.CTR: {
         var arity = K.get_ari(term);
         for (var i = 0; i < arity; ++i) {
           find_lets(K.get_lnk(MEM, term,i));
         }
         break;
+      }
     }
   }
   function go(term: K.Lnk) : string {
@@ -113,15 +117,6 @@ export function show_term(MEM: K.Mem, term: K.Lnk) : string {
           args.push(go(K.get_lnk(MEM, term, i)));
         }
         return "$" + func + ":" + arit + "{" + args.join(" ") + "}";
-      }
-      case K.CAL: {
-        let func = K.get_fun(term);
-        let arit = K.get_ari(term);
-        let args = [];
-        for (let i = 0; i < arit; ++i) {
-          args.push(go(K.get_lnk(MEM, term, i)));
-        }
-        return "@" + func + ":" + arit + "(" + args.join(" ") + ")";
       }
       case K.DP0: {
         return "a" + (names[K.get_loc(term,0)] || "?");
@@ -289,23 +284,6 @@ export function read_term(code: string) : K.Mem {
           K.link(MEM, node+i, args[i]);
         }
         return K.Ctr(func, arit, node);
-      // @0(1 2 3)
-      case "@":
-        code = consume("@");
-        var func = parse_numb();
-        code = consume(":");
-        var arit = parse_numb();
-        code = consume("(");
-        var node = K.alloc(MEM, arit);
-        var args = [];
-        for (var i = 0; i < arit; ++i) {
-          args.push(parse_term(node + i));
-        }
-        code = consume(")");
-        for (var i = 0; i < arit; ++i) {
-          K.link(MEM, node+i, args[i]);
-        }
-        return K.Cal(func, arit, node);
       default:
         var name = parse_name();
         var vari = K.Nil();
