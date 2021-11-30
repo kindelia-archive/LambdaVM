@@ -10,7 +10,8 @@ export type MAP<T> = Record<string, T>;
 // VAR: {tag: U4, pos: U28 | U40}
 // ARG: {tag: U4, pos: U28 | U40}
 // CTR: {tag: U4, fun: U16, ari: U4, pos: U28 | U40}
-// NUM: {tag: U4, val: U32}
+// OP2: {tag: U4, ope: U16, pos: U28 | U40}
+// U32: {tag: U4, val: U32}
 
 export const NIL : number = 0
 export const LAM : number = 1
@@ -21,7 +22,9 @@ export const DP1 : number = 5
 export const VAR : number = 6
 export const ARG : number = 7
 export const CTR : number = 8
-export const NUM : number = 9
+export const OP2 : number = 9
+export const CMP : number = 10
+export const U32 : number = 11
 
 //GENERATED_CONSTRUCTOR_IDS_START//
 //GENERATED_CONSTRUCTOR_IDS//

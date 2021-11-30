@@ -223,6 +223,7 @@ export function compile_group(
         }
         return "Ctr(" + (compile_constructor_name(term.name)||0) + ", " + ctr_args.length + ", " + name + ")";
     }
+    throw "TODO: compile_term of " + term.$;
   }
 
   // Associates an expression with a fresh name.
@@ -376,6 +377,7 @@ export function sanitize(rule: LB.Rule): {rule: LB.Rule, uses: {[key:string]:num
         return LB.Ctr(name, args);
       }
     }
+    throw "TODO: sanitize_term of " + term.$;
   }
 
   var table = create_fresh(rule);
