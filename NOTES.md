@@ -117,3 +117,6 @@ Then we'd have the following, direct reduction:
 "cat"
 ```
 
+**EDIT: solved.**
+
+https://github.com/Kindelia/LamRT/commit/409617582631431af12cd2b5d7281a3a0a0c5d73
