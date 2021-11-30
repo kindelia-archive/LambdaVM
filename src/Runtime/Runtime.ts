@@ -533,8 +533,8 @@ export function reduce(MEM: Mem, host: number) : Lnk {
             } else {
               let ctr0 = get_loc(expr,0);
               let ctr1 = alloc(MEM, arit);
-              subst(MEM, get_lnk(MEM,term,0), Ctr(func, arit, ctr0));
-              subst(MEM, get_lnk(MEM,term,1), Ctr(func, arit, ctr1));
+              var term_lnk_0 = get_lnk(MEM,term,0);
+              var term_lnk_1 = get_lnk(MEM,term,1);
               for (let i = 0; i < arit; ++i) {
                 let leti = i === 0 ? get_loc(term,0) : alloc(MEM, 3);
                 var expr_lnk_i = get_lnk(MEM, expr, i);
@@ -542,6 +542,8 @@ export function reduce(MEM: Mem, host: number) : Lnk {
                 link(MEM, ctr1+i, Dp1(get_col(term), leti));
                 link(MEM, leti+2, expr_lnk_i);
               }
+              subst(MEM, term_lnk_0, Ctr(func, arit, ctr0));
+              subst(MEM, term_lnk_1, Ctr(func, arit, ctr1));
               return link(MEM, host, Ctr(func, arit, get_tag(term) === DP0 ? ctr0 : ctr1));
             }
             //let ctr0 = alloc(MEM, arit);
