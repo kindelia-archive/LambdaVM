@@ -1,14 +1,18 @@
-import * as LB from "https://raw.githubusercontent.com/Kindelia/Lambolt/master/src/Lambolt.ts"
+//import * as L from "./../../../Lambolt/src/Lambolt.ts"
+import * as L from "https://raw.githubusercontent.com/Kindelia/Lambolt/master/src/Lambolt.ts"
 
 // Compiler
 // --------
 
 // Compiles a Lambolt file to a target language.
-export function compile(file: LB.File, target: string, template: string) {
+export function compile(file: L.File, target: string, template: string) {
   console.log("compiling file");
 
   // Generates the name table.
   var name_table = gen_name_table(file);
+
+  // Generates iscal.
+  var iscal = gen_iscal(file);
 
   // Groups the rules by name.
   var groups = gen_groups(file);
@@ -22,7 +26,7 @@ export function compile(file: LB.File, target: string, template: string) {
   // Compiles each group's rewrite rules.
   var rewrite_rules = "";
   for (var group_name in groups) {
-    rewrite_rules += compile_group(group_name, groups[group_name][0], groups[group_name][1], name_table, target, 5);
+    rewrite_rules += compile_group(group_name, groups[group_name][0], groups[group_name][1], name_table, iscal, target, 5);
   }
 
   //console.log(constructor_ids);
@@ -37,12 +41,13 @@ export function compile(file: LB.File, target: string, template: string) {
 export function compile_group(
   name: string,
   arity: number,
-  rules: Array<LB.Rule>,
+  rules: Array<L.Rule>,
   name_table: {[name:string]:number},
+  iscal: {[name:string]:boolean},
   target: string,
   tab: number
 ): string {
-  function compile_group(name: string, arity: number, rules: Array<{rule:LB.Rule,uses:{[key:string]:number}}>, tab: number) {
+  function compile_group(name: string, arity: number, rules: Array<{rule:L.Rule,uses:{[key:string]:number}}>, tab: number) {
     text += line(tab, "case " + compile_constructor_name(name) + ": {");
 
     // Finds which arguments of the group need to be reduced. For example, here:
@@ -79,7 +84,7 @@ export function compile_group(
       if (reduce_at[i]) {
         text += line(tab+1, VAR(target)+" LNK_"+i+" = reduce(MEM, LOC_"+i+");");
       } else {
-        text += line(tab+1, VAR(target)+" LNK_"+i+" = get_arg(MEM, LOC_"+i+");");
+        text += line(tab+1, VAR(target)+" LNK_"+i+" = get_lnk(MEM, term, "+i+");");
       }
     }
 
@@ -96,8 +101,15 @@ export function compile_group(
         var conds = [];
         for (var i = 0; i < arity; ++i) {
           var term = rule.lhs.args[i];
-          if (term.$ === "Ctr") {
-            conds.push("get_fun(LNK_"+i+") == "+(compile_constructor_name(term.name)||"?"));
+          switch (term.$) {
+            case "Ctr": {
+              conds.push("get_fun(LNK_"+i+") == "+(compile_constructor_name(term.name)||"?"));
+              break;
+            }
+            case "U32": {
+              conds.push("get_num(LNK_"+i+") == "+term.numb);
+              break;
+            }
           }
         }
         text += line(tab+1, "if ("+(conds.join(" && ") || "1")+") {");
@@ -142,6 +154,10 @@ export function compile_group(
               }
               break;
             }
+            // If the argument is a number, we don't need to do anything.
+            case "U32": {
+              break;
+            }
             // Otherwise, something is very wrong.
             default: {
               throw "Invalid left-hand side.";
@@ -177,7 +193,7 @@ export function compile_group(
 
   // Compiles a term (i.e., the right-hand side). It just allocates space for
   // the term and creates the links.
-  function compile_term(term: LB.Term, tab: number) : string {
+  function compile_term(term: L.Term, tab: number) : string {
     switch (term.$) {
       case "Var":
         return args[term.name] ? args[term.name] : "?";
@@ -221,9 +237,18 @@ export function compile_group(
         for (var i = 0; i < ctr_args.length; ++i) {
           text += line(tab, "link(MEM, " + name+"+"+i + ", " + ctr_args[i] + ");");
         }
-        return "Ctr(" + (compile_constructor_name(term.name)||0) + ", " + ctr_args.length + ", " + name + ")";
+        return (iscal[term.name] ? "Cal" : "Ctr") + "(" + (compile_constructor_name(term.name)||0) + ", " + ctr_args.length + ", " + name + ")";
+      case "Op2":
+        var name = fresh("op2");
+        var val0 = compile_term(term.val0, tab);
+        var val1 = compile_term(term.val1, tab);
+        text += line(tab, VAR(target) + " " + name + " = alloc(MEM, 2);");
+        text += line(tab, "link(MEM, " + name+"+0, " + val0 + ");");
+        text += line(tab, "link(MEM, " + name+"+1, " + val1 + ");");
+        return "Op2(" + term.oper.toUpperCase() + ", " + name + ")";
+      case "U32":
+        return "U_32(" + term.numb + ")";
     }
-    throw "TODO: compile_term of " + term.$;
   }
 
   // Associates an expression with a fresh name.
@@ -260,14 +285,14 @@ function compile_constructor_name(name: string) {
 //   sanitize `(fn (cons head tail)) = (cons (pair head head) tail)`
 //         ~> `(fn (cons x0   x1))   = (cons (pair x0.0 x0.1) x1.0)`
 // It also returns the usage count of each variable.
-export function sanitize(rule: LB.Rule): {rule: LB.Rule, uses: {[key:string]:number}} {
+export function sanitize(rule: L.Rule): {rule: L.Rule, uses: {[key:string]:number}} {
   var size = 0;
   var uses : {[key:string]: number} = {};
   function fresh() : string {
     return "x" + (size++);
   }
 
-  function duplicator(name: string, expr: LB.Term, body: LB.Term): LB.Term {
+  function duplicator(name: string, expr: L.Term, body: L.Term): L.Term {
     var amount = uses[name];
     if (amount > 1) {
       var vars = [];
@@ -275,22 +300,22 @@ export function sanitize(rule: LB.Rule): {rule: LB.Rule, uses: {[key:string]:num
         vars.push(i < amount - 2 ? "c." + i : name + "." + (i - (amount - 2)));
       }
       vars.reverse();
-      return (function go(i: number, body: LB.Term): LB.Term {
+      return (function go(i: number, body: L.Term): L.Term {
         if (i === amount - 1) {
           return body;
         } else {
           var var0 = vars.pop() as string;
           var var1 = vars.pop() as string;
-          var exp0 = i === 0 ? expr : LB.Var("c." + (i - 1));
-          return LB.Dup(var0, var1, exp0, go(i + 1, body));
+          var exp0 = i === 0 ? expr : L.Var("c." + (i - 1));
+          return L.Dup(var0, var1, exp0, go(i + 1, body));
         }
       })(0, body);
     } else {
-      return LB.Let(name+".0", expr, body);
+      return L.Let(name+".0", expr, body);
     }
   }
 
-  function create_fresh(rule: LB.Rule): {[key:string]: string} {
+  function create_fresh(rule: L.Rule): {[key:string]: string} {
     var table : {[key:string]:string} = {};
     switch (rule.lhs.$) {
       case "Ctr": {
@@ -316,6 +341,9 @@ export function sanitize(rule: LB.Rule): {rule: LB.Rule, uses: {[key:string]:num
               }
               break;
             }
+            case "U32": {
+              break;
+            }
             default: {
               throw "Invalid left-hand side.";
             }
@@ -330,17 +358,17 @@ export function sanitize(rule: LB.Rule): {rule: LB.Rule, uses: {[key:string]:num
     return table;
   }
 
-  function sanitize_term(term: LB.Term, table: {[key:string]:string}, lhs: boolean): LB.Term {
+  function sanitize_term(term: L.Term, table: {[key:string]:string}, lhs: boolean): L.Term {
     switch (term.$) {
       case "Var": {
         if (lhs) {
-          return LB.Var(table[term.name] || term.name);
+          return L.Var(table[term.name] || term.name);
         } else {
           if (table[term.name]) {
             var used = uses[table[term.name]] || 0;
             var name = table[term.name] + "." + used;
             uses[table[term.name]] = used + 1;
-            return LB.Var(name);
+            return L.Var(name);
           } else {
             throw "Error: unbound variable '" + term.name + "'.";
           }
@@ -351,7 +379,7 @@ export function sanitize(rule: LB.Rule): {rule: LB.Rule, uses: {[key:string]:num
         let nam1 = fresh();
         let expr = sanitize_term(term.expr, table, lhs);
         let body = sanitize_term(term.body, {...table, [term.nam0]: nam0, [term.nam1]: nam1}, lhs);
-        return LB.Dup(nam0+".0", nam1+".0", expr, body);
+        return L.Dup(nam0+".0", nam1+".0", expr, body);
       }
       case "Let": {
         let name = fresh();
@@ -364,38 +392,46 @@ export function sanitize(rule: LB.Rule): {rule: LB.Rule, uses: {[key:string]:num
         let name = fresh();
         let body = sanitize_term(term.body, {...table, [term.name]: name}, lhs);
         var used = uses[name] || 0;
-        return LB.Lam(name, duplicator(name, LB.Var(name), body));
+        return L.Lam(name, duplicator(name, L.Var(name), body));
       }
       case "App": {
         let func = sanitize_term(term.func, table, lhs);
         let argm = sanitize_term(term.argm, table, lhs);
-        return LB.App(func, argm);
+        return L.App(func, argm);
       }
       case "Ctr": {
         let name = term.name;
         let args = term.args.map(x => sanitize_term(x,table, lhs));
-        return LB.Ctr(name, args);
+        return L.Ctr(name, args);
+      }
+      case "Op2": {
+        var oper = term.oper;
+        var val0 = sanitize_term(term.val0, table, lhs);
+        var val1 = sanitize_term(term.val1, table, lhs);
+        return L.Op2(oper, val0, val1);
+      }
+      case "U32": {
+        return L.U32(term.numb);
       }
     }
-    throw "TODO: sanitize_term of " + term.$;
   }
 
   var table = create_fresh(rule);
   var lhs = sanitize_term(rule.lhs, {...table}, true);
   var rhs = sanitize_term(rule.rhs, {...table}, false);
   for (var key in table) {
-    rhs = duplicator(table[key], LB.Var(table[key]), rhs);
+    rhs = duplicator(table[key], L.Var(table[key]), rhs);
   }
-  var rule = LB.Rule(lhs, rhs);
+  var rule = L.Rule(lhs, rhs);
   return {rule, uses};
 }
 
 // Generates a name table for a whole program. That table links constructor
 // names (such as `cons` and `succ`) to small ids (such as `0` and `1`).
-export function gen_name_table(file: LB.File) : {[name: string]: number} {
+export function gen_name_table(file: L.File) : {[name: string]: number} {
   var table : {[name: string]: number} = {};
   var fresh : number = 0;
-  function find_ctrs(term: LB.Term) {
+  function find_ctrs(term: L.Term) {
     switch (term.$) {
       case "Var": {
         break;
@@ -428,6 +464,14 @@ export function gen_name_table(file: LB.File) : {[name: string]: number} {
         }
         break;
       }
+      case "Op2": {
+        find_ctrs(term.val0);
+        find_ctrs(term.val1);
+        break;
+      }
+      case "U32": {
+        break;
+      }
     }
   }
   for (var rule of file) {
@@ -437,14 +481,25 @@ export function gen_name_table(file: LB.File) : {[name: string]: number} {
   return table;
 }
 
+// Finds constructors that are used as functions.
+export function gen_iscal(file: L.File) : {[name: string]: boolean} {
+  var iscal : {[name: string]: boolean} = {};
+  for (var rule of file) {
+    if (rule.lhs.$ === "Ctr") {
+      iscal[rule.lhs.name] = true;
+    }
+  }
+  return iscal;
+}
+
 // Groups rules by name. For example:
 //   (add (succ a) (succ b)) = (succ (succ (add a b)))
 //   (add (succ a) (zero)  ) = (succ a)
 //   (add (zero)   (succ b)) = (succ b)
 //   (add (zero)   (zero)  ) = (zero)
 // This is a group of 4 rules starting with the "add" name.
-export function gen_groups(file: LB.File): {[key: string]: [number, Array<LB.Rule>]} {
-  var groups : {[key: string]: [number, Array<LB.Rule>]} = {};
+export function gen_groups(file: L.File): {[key: string]: [number, Array<L.Rule>]} {
+  var groups : {[key: string]: [number, Array<L.Rule>]} = {};
   for (var rule of file) {
     if (rule.lhs.$ === "Ctr") {
       if (!groups[rule.lhs.name]) {

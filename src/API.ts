@@ -1,7 +1,8 @@
 // Importing a dylib on TypeScript
 
+//import * as Lambolt from "./../../Lambolt/src/Lambolt.ts"
 import * as Lambolt from "https://raw.githubusercontent.com/Kindelia/Lambolt/master/src/Lambolt.ts"
-import * as Crusher from "./Crusher/Language.ts"
+import * as Runtime from "./Runtime/Runtime.ts"
 import * as Compile from "./Compile/Compile.ts"
 import * as Convert from "./Compile/Convert.ts"
 
@@ -14,7 +15,7 @@ function dylib_suffix() {
 }
 
 async function build_runtime(file: Lambolt.File, target: string) {
-  var source_path = new URL("./Crusher/Runtime."+target, import.meta.url);
+  var source_path = new URL("./Runtime/Runtime."+target, import.meta.url);
   var target_path = new URL("./../bin/Runtime."+target, import.meta.url);
   var source_code = await Deno.readTextFile(source_path);
   var target_code = Compile.compile(file, target, source_code);
@@ -45,7 +46,7 @@ function load_c_dylib() {
   });
 }
 
-function normal_clang(MEM: Crusher.Mem, host: number): number {
+function normal_clang(MEM: Runtime.Mem, host: number): number {
   var dylib = load_c_dylib();
 
   function convert(arr: Uint32Array): Uint8Array {
@@ -89,7 +90,7 @@ export async function run(code: string, opts: any) {
   // Builds normalizer function
   // --------------------------
 
-  var normal : ((MEM: Crusher.Mem, host: number) => number) | null = null;
+  var normal : ((MEM: Runtime.Mem, host: number) => number) | null = null;
 
   if (opts.target === "c") {
     await build_runtime(file, "c");
@@ -99,26 +100,21 @@ export async function run(code: string, opts: any) {
 
   if (opts.target === "ts") {
     await build_runtime(file, "ts");
-    var Runtime = await import((new URL("./../bin/Runtime.ts", import.meta.url)).pathname);
-    normal = Runtime.normal;
+    normal = (await import((new URL("./../bin/Runtime.ts", import.meta.url)).pathname)).normal;
   }
 
   // Builds runtime memory
   // ---------------------
 
-  if (opts.core) {
-    var mem = Crusher.read_term(code);
-  } else {
-    var mem = Crusher.init();
-    Crusher.link(mem, 0, Crusher.Ctr(name_table["main"] || 0, 0, 0));
-  }
+  var mem = Runtime.init();
+  Runtime.link(mem, 0, Runtime.Cal(name_table["main"] || 0, 0, 0));
 
   // Evaluates main()
   // ----------------
 
   if (normal !== null) {
     var gas = normal(mem, 0);
-    console.log(Convert.crusher_to_lambolt(mem, Crusher.deref(mem,0), numb_table));
+    console.log(Convert.runtime_to_lambolt(mem, Runtime.deref(mem,0), numb_table));
     console.log("");
     console.log("* gas: " + gas);
     console.log("* mem: " + mem.lnk.size);
