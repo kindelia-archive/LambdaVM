@@ -1,0 +1,11 @@
+// Adds a natural number with overlapping patterns
+(add (succ a) b) = (succ (add a b))
+(add a (succ b)) = (succ (add a b))
+(add (zero)   b) = b
+(add a   (zero)) = a
+
+// Reduces on BOTH sides!
+(main) = (pair
+  λx (add x (succ (zero)))
+  λx (add (succ (zero)) x)
+)
