@@ -50,7 +50,6 @@ typedef struct {
   u64* data;
 } Arr;
 
-
 typedef struct {
   Arr* lnk;
   u64 gas;
@@ -256,12 +255,12 @@ void collect(Mem* mem, Lnk term) {
     }
     case DP0: {
       link(mem, get_loc(term,0), Nil());
-      reduce(mem, get_loc(get_lnk(mem,term,1),0));
+      //reduce(mem, get_loc(get_lnk(mem,term,1),0));
       break;
     }
     case DP1: {
       link(mem, get_loc(term,1), Nil());
-      reduce(mem, get_loc(get_lnk(mem,term,0),0));
+      //reduce(mem, get_loc(get_lnk(mem,term,0),0));
       break;
     }
     case CAL:

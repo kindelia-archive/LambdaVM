@@ -89,7 +89,6 @@ export function array_pop(arr: Arr) : number | null {
 export var GAS : number = 0;
 ////export var MEM : Mem = null as unknown as Mem;
 
-
 export function Nil() : Lnk {
   return NIL;
 }
@@ -260,12 +259,12 @@ export function collect(MEM: Mem, term: Lnk) {
     }
     case DP0: {
       link(MEM, get_loc(term,0), Nil());
-      reduce(MEM, get_loc(get_lnk(MEM,term,1),0));
+      //reduce(MEM, get_loc(get_lnk(MEM,term,1),0));
       break;
     }
     case DP1: {
       link(MEM, get_loc(term,1), Nil());
-      reduce(MEM, get_loc(get_lnk(MEM,term,0),0));
+      //reduce(MEM, get_loc(get_lnk(MEM,term,0),0));
       break;
     }
     case CAL:
@@ -302,6 +301,7 @@ export function subst(MEM: Mem, lnk: Lnk, val: Lnk) {
     collect(MEM, val);
   }
 }
+
 
 export function reduce(MEM: Mem, host: number) : Lnk {
   while (true) {
@@ -401,7 +401,7 @@ export function reduce(MEM: Mem, host: number) : Lnk {
       case DP1: {
         let expr = reduce(MEM, get_loc(term,2));
         switch (get_tag(expr)) {
-          // !A<r s> = λx: f
+          // !A<r s> = λx f
           // --------------- LET-LAM
           // !A<f0 f1> = f
           // r <- λx0: f0
