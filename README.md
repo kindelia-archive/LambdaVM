@@ -22,11 +22,11 @@ A next-gen, massively parallel, beta-optimal functional runtime.
 
     ```javascript
     // Doubles a natural number
-    (double (zero))   = (zero)
-    (double (succ x)) = (succ (succ (double x)))
+    (Double (Zero))   = (Zero)
+    (Double (Succ x)) = (Succ (Succ (Double x)))
 
     // Computes 3 * 3
-    (main) = (double (succ (succ (succ (zero)))))
+    (Main) = (Double (Succ (Succ (Succ (Zero)))))
     ```
 
 5. Run it:

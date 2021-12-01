@@ -76,9 +76,10 @@ export async function run(code: string, opts: any) {
   // --------------------------
   
   var file = Lambolt.read(Lambolt.parse_file, code);
+
   //console.log(Lambolt.show_file(file));
   var main = file[file.length - 1];
-  if (!(main && main.$ === "Rule" && main.lhs.$ === "Ctr" && main.lhs.name === "main" && main.lhs.args.length === 0)) {
+  if (!(main && main.$ === "Rule" && main.lhs.$ === "Ctr" && main.lhs.name === "Main" && main.lhs.args.length === 0)) {
     throw "Main not found.";
   }
   var name_table = Compile.gen_name_table(file);
@@ -107,7 +108,7 @@ export async function run(code: string, opts: any) {
   // ---------------------
 
   var mem = Runtime.init();
-  Runtime.link(mem, 0, Runtime.Cal(name_table["main"] || 0, 0, 0));
+  Runtime.link(mem, 0, Runtime.Cal(name_table["Main"] || 0, 0, 0));
 
   // Evaluates main()
   // ----------------

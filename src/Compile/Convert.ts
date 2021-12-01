@@ -75,7 +75,7 @@ export function runtime_to_lambolt(MEM: C.Mem, input_term: C.Lnk | null = null, 
         case C.APP: {
           let func = go(C.get_lnk(MEM, term, 0), stacks, seen, depth + 1);
           let argm = go(C.get_lnk(MEM, term, 1), stacks, seen, depth + 1);
-          return "[" + func + " " + argm + "]"
+          return "(" + func + " " + argm + ")"
         }
         case C.PAR: {
           let col = C.get_col(term);
@@ -91,7 +91,7 @@ export function runtime_to_lambolt(MEM: C.Mem, input_term: C.Lnk | null = null, 
           } else {
             let val0 = go(C.get_lnk(MEM, term, 0), stacks, seen, depth + 1);
             let val1 = go(C.get_lnk(MEM, term, 1), stacks, seen, depth + 1);
-            return "{" + val0 + " " + val1 + "}"
+            return "<" + val0 + " " + val1 + ">"
           }
         }
         case C.DP0: {
@@ -128,10 +128,10 @@ export function runtime_to_lambolt(MEM: C.Mem, input_term: C.Lnk | null = null, 
           })();
           let val0 = go(C.get_lnk(MEM, term, 0), stacks, seen, depth + 1);
           let val1 = go(C.get_lnk(MEM, term, 1), stacks, seen, depth + 1);
-          return "{" + val0 + " " + oper + " " + val1 + "}"
+          return "(" + oper + " " + val0 + " " + val1 + ")"
         }
         case C.U32: {
-          return "#" + C.get_num(term);
+          return "" + C.get_num(term);
         }
         case C.VAR: {
           return names[term] || "^"+String(C.get_loc(term,0)); // + "<" + C.show_lnk(C.deref(MEM, C.get_loc(term,0))) + ">";

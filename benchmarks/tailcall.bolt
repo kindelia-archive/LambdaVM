@@ -1,5 +1,5 @@
-(loop #0) = #42
-(loop n ) = (loop {n - #1})
+(Loop 0) = 42
+(Loop n) = (Loop (- n 1))
 
-(main) = (loop #1000000000)
+(Main) = (Loop 1000000000)
 
