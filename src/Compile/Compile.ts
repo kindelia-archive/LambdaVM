@@ -275,7 +275,7 @@ export function compile_group(
 
 // Compiles a constructor name
 function compile_constructor_name(name: string) {
-  return "$"+name.toUpperCase();
+  return "$"+name.toUpperCase().replace(/\./g,"$");
 }
 
 // This big function sanitizes a rule. That is, it renames every variable in a
