@@ -46,11 +46,4 @@
 (Generate seed 0) = (Nil)
 (Generate seed n) = (Cons seed (Generate (+ (* seed 1664525) 1013904223) (- n 1)))
 
-(Slice 0 list)        = (Nil)
-(Slice n (Nil))       = (Nil)
-(Slice n (Cons x xs)) = (Cons x (Slice (- n 1) xs))
-
-(Sum (Nil))       = 0
-(Sum (Cons x xs)) = (+ x (Sum xs))
-
 (Main) = (Quicksort (Generate 0 2500))
