@@ -124,6 +124,14 @@ export function runtime_to_lambolt(MEM: C.Mem, input_term: C.Lnk | null = null, 
               case C.AND: return "&";
               case C.OR : return "|";
               case C.XOR: return "^";
+              case C.SHL: return "<<";
+              case C.SHR: return ">>";
+              case C.LTN: return "<";
+              case C.LTE: return "<=";
+              case C.EQL: return "==";
+              case C.GTE: return ">=";
+              case C.GTN: return ">";
+              case C.NEQ: return "!=";
             }
           })();
           let val0 = go(C.get_lnk(MEM, term, 0), stacks, seen, depth + 1);
