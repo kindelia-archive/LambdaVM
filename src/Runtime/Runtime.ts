@@ -637,11 +637,11 @@ export function normal(MEM: Mem, host: number) : number {
 
 function normal_go(MEM: Mem, host: number, seen: MAP<boolean>) : Lnk {
   var term = deref(MEM, host);
-  if (seen[get_loc(term,0)]) {
+  if (seen[host]) {
     return term;
   } else {
     term = reduce(MEM, host);
-    seen[get_loc(term,0)] = true;
+    seen[host] = true;
     switch (get_tag(term)) {
       case LAM: {
         link(MEM, get_loc(term,1), normal_go(MEM, get_loc(term,1), seen));
