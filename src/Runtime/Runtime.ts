@@ -364,12 +364,12 @@ export function reduce(MEM: Mem, host: number) : Lnk {
         }
         break;
       }
-      // {a _op_ b}
-      // ---------- OP2-U32
-      // _op_(a, b)
       case OP2: {
         var val0 = reduce(MEM, get_loc(term,0));
         var val1 = reduce(MEM, get_loc(term,1));
+        // (+ a b)
+        // --------- OP2-U32
+        // add(a, b)
         if (get_tag(val0) === U32 && get_tag(val1) === U32) {
           var a = get_num(val0);
           var b = get_num(val1);
@@ -395,6 +395,42 @@ export function reduce(MEM: Mem, host: number) : Lnk {
           }
           clear(MEM, get_loc(term,0), 2);
           return link(MEM, host, U_32(c));
+        }
+        // (+ &A<a0 a1> b)
+        // --------------- OP2-PAR
+        // !A<b0 b1> = b
+        // &A<(+ a0 b0) (+ a1 b1)>
+        if (get_tag(val0) == PAR) {
+          var op20 = get_loc(term, 0);
+          var op21 = get_loc(val0, 0);
+          var let0 = alloc(MEM, 3);
+          var par0 = alloc(MEM, 2);
+          link(MEM, let0+2, val1);
+          link(MEM, op20+1, Dp0(get_col(val0), let0));
+          link(MEM, op20+0, get_lnk(MEM, val0, 0));
+          link(MEM, op21+0, get_lnk(MEM, val0, 1));
+          link(MEM, op21+1, Dp1(get_col(val0), let0));
+          link(MEM, par0+0, Op2(get_ope(term), op20));
+          link(MEM, par0+1, Op2(get_ope(term), op21));
+          return link(MEM, host, Par(get_col(val0), par0));
+        }
+        // (+ a &A<b0 b1>)
+        // --------------- OP2-PAR
+        // !A<a0 a1> = a
+        // &A<(+ a0 a1) (+ b0 b1)>
+        if (get_tag(val1) == PAR) {
+          var op20 = get_loc(term, 0);
+          var op21 = get_loc(val1, 0);
+          var let0 = alloc(MEM, 3);
+          var par0 = alloc(MEM, 2);
+          link(MEM, let0+2, val0);
+          link(MEM, op20+1, Dp0(get_col(val1), let0));
+          link(MEM, op20+0, get_lnk(MEM, val1, 0));
+          link(MEM, op21+0, get_lnk(MEM, val1, 1));
+          link(MEM, op21+1, Dp1(get_col(val1), let0));
+          link(MEM, par0+0, Op2(get_ope(term), op20));
+          link(MEM, par0+1, Op2(get_ope(term), op21));
+          return link(MEM, host, Par(get_col(val1), par0));
         }
         break;
       }
