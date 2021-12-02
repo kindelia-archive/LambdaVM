@@ -46,4 +46,17 @@
 (Generate seed 0) = (Nil)
 (Generate seed n) = (Cons seed (Generate (+ (* seed 1664525) 1013904223) (- n 1)))
 
-(Main) = (Quicksort (Generate 0 2500))
+(Sum (Nil))       = 0
+(Sum (Cons x xs)) = (+ x (Sum xs))
+
+(Slow n) = (Slow.go n 0)
+  (Slow.go 0 r) = r
+  (Slow.go n r) = (Slow.go (- n 1) (+ r (Sum (Quicksort (Generate n 2500)))))
+
+(Main) = (> 9 8)
+
+
+
+
+
+

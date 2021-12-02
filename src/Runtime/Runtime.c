@@ -338,12 +338,12 @@ Lnk reduce(Mem* MEM, u64 host) {
         }
         break;
       }
-      // {a _op_ b}
-      // ---------- OP2-U32
-      // _op_(a, b)
       case OP2: {
         Lnk val0 = reduce(MEM, get_loc(term,0));
         Lnk val1 = reduce(MEM, get_loc(term,1));
+        // (+ a b)
+        // --------- OP2-U32
+        // add(a, b)
         if (get_tag(val0) == U32 && get_tag(val1) == U32) {
           u32 a = get_num(val0);
           u32 b = get_num(val1);
@@ -367,44 +367,44 @@ Lnk reduce(Mem* MEM, u64 host) {
             case NEQ: c = a != b; break;
             default : c = 0; break;
           }
-          // (+ &A<a0 a1> b)
-          // --------------- OP2-PAR
-          // !A<b0 b1> = b
-          // &A<(+ a0 b0) (+ a1 b1)>
-          if (get_tag(val0) == PAR) {
-            u64 op20 = get_loc(term, 0);
-            u64 op21 = get_loc(val0, 0);
-            u64 let0 = alloc(MEM, 3);
-            u64 par0 = alloc(MEM, 2);
-            link(MEM, let0+2, val1);
-            link(MEM, op20+1, Dp0(get_col(val0), let0));
-            link(MEM, op20+0, get_lnk(MEM, val0, 0));
-            link(MEM, op21+0, get_lnk(MEM, val0, 1));
-            link(MEM, op21+1, Dp1(get_col(val0), let0));
-            link(MEM, par0+0, Op2(get_ope(term), op20));
-            link(MEM, par0+1, Op2(get_ope(term), op21));
-            return link(MEM, host, Par(get_col(val0), par0));
-          }
-          // (+ a &A<b0 b1>)
-          // --------------- OP2-PAR
-          // !A<a0 a1> = a
-          // &A<(+ a0 a1) (+ b0 b1)>
-          if (get_tag(val1) == PAR) {
-            u64 op20 = get_loc(term, 0);
-            u64 op21 = get_loc(val1, 0);
-            u64 let0 = alloc(MEM, 3);
-            u64 par0 = alloc(MEM, 2);
-            link(MEM, let0+2, val0);
-            link(MEM, op20+1, Dp0(get_col(val1), let0));
-            link(MEM, op20+0, get_lnk(MEM, val1, 0));
-            link(MEM, op21+0, get_lnk(MEM, val1, 1));
-            link(MEM, op21+1, Dp1(get_col(val1), let0));
-            link(MEM, par0+0, Op2(get_ope(term), op20));
-            link(MEM, par0+1, Op2(get_ope(term), op21));
-            return link(MEM, host, Par(get_col(val1), par0));
-          }
           clear(MEM, get_loc(term,0), 2);
           return link(MEM, host, U_32(c));
+        }
+        // (+ &A<a0 a1> b)
+        // --------------- OP2-PAR
+        // !A<b0 b1> = b
+        // &A<(+ a0 b0) (+ a1 b1)>
+        if (get_tag(val0) == PAR) {
+          u64 op20 = get_loc(term, 0);
+          u64 op21 = get_loc(val0, 0);
+          u64 let0 = alloc(MEM, 3);
+          u64 par0 = alloc(MEM, 2);
+          link(MEM, let0+2, val1);
+          link(MEM, op20+1, Dp0(get_col(val0), let0));
+          link(MEM, op20+0, get_lnk(MEM, val0, 0));
+          link(MEM, op21+0, get_lnk(MEM, val0, 1));
+          link(MEM, op21+1, Dp1(get_col(val0), let0));
+          link(MEM, par0+0, Op2(get_ope(term), op20));
+          link(MEM, par0+1, Op2(get_ope(term), op21));
+          return link(MEM, host, Par(get_col(val0), par0));
+        }
+        // (+ a &A<b0 b1>)
+        // --------------- OP2-PAR
+        // !A<a0 a1> = a
+        // &A<(+ a0 a1) (+ b0 b1)>
+        if (get_tag(val1) == PAR) {
+          u64 op20 = get_loc(term, 0);
+          u64 op21 = get_loc(val1, 0);
+          u64 let0 = alloc(MEM, 3);
+          u64 par0 = alloc(MEM, 2);
+          link(MEM, let0+2, val0);
+          link(MEM, op20+1, Dp0(get_col(val1), let0));
+          link(MEM, op20+0, get_lnk(MEM, val1, 0));
+          link(MEM, op21+0, get_lnk(MEM, val1, 1));
+          link(MEM, op21+1, Dp1(get_col(val1), let0));
+          link(MEM, par0+0, Op2(get_ope(term), op20));
+          link(MEM, par0+1, Op2(get_ope(term), op21));
+          return link(MEM, host, Par(get_col(val1), par0));
         }
         break;
       }
@@ -545,12 +545,12 @@ Lnk reduce(Mem* MEM, u64 host) {
 
 // sets the nth bit of a bit-array represented as a u64 array
 void set_bit(u64* bits, u64 bit) {
-    bits[bit >> 6] |= (1ULL << (bit & 0x3f));
+  bits[bit >> 6] |= (1ULL << (bit & 0x3f));
 }
 
 // gets the nth bit of a bit-array represented as a u64 array
 u8 get_bit(u64* bits, u8 bit) {
-    return (bits[bit >> 6] >> (bit & 0x3F)) & 1;
+  return (bits[bit >> 6] >> (bit & 0x3F)) & 1;
 }
 
 void normal_fork(u64 tid, u64 host);
