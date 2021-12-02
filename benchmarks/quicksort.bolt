@@ -1,0 +1,56 @@
+// Doesn't work for large sizes because of stack overflow.
+// Waiting for the stack-free update on Lambolt.
+
+// size |    gas
+// ---- | ------
+//  100 |   9727
+//  200 |  22486
+//  300 |  36490
+//  400 |  51432
+//  500 |  66099
+//  600 |  81566
+//  700 |  96976
+//  800 | 113378
+//  900 | 129453
+// 1000 | 145884
+// 1100 | 162755
+// 1200 | 179733
+// 1300 | 197236
+// 1400 | 213996
+// 1500 | 231845
+// 1600 | 250446
+// 1700 | 268136
+// 1800 | 286086
+// 1900 | 303958
+// 2000 | 322327
+// 2100 | 340466
+// 2200 | 358210
+// 2300 | 376381
+// 2400 | 394793
+// 2500 | 413324
+
+(Filter fn (Cons x xs)) = (Filter.Cons (fn x) fn x xs)
+  (Filter.Cons 1 fn x xs) = (Cons x (Filter fn xs))
+  (Filter.Cons 0 fn x xs) = (Filter fn xs)
+(Filter fn (Nil)) = (Nil)
+
+(Concat (Nil) b)        = b
+(Concat (Cons ah at) b) = (Cons ah (Concat at b))
+
+(Quicksort (Nil)) = (Nil)
+(Quicksort (Cons h t)) =
+  let min = (Filter λx(< x h) t)
+  let max = (Filter λx(> x h) t)
+  (Concat (Quicksort min) (Cons h (Quicksort max)))
+
+(Generate seed 0) = (Nil)
+(Generate seed n) = (Cons seed (Generate (+ (* seed 1664525) 1013904223) (- n 1)))
+
+(Slice 0 list)        = (Nil)
+(Slice n (Nil))       = (Nil)
+(Slice n (Cons x xs)) = (Cons x (Slice (- n 1) xs))
+
+(Sum (Nil))       = 0
+(Sum (Cons x xs)) = (+ x (Sum xs))
+
+(Main) = (Quicksort (Generate 0 2500))
