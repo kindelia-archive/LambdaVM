@@ -370,6 +370,7 @@ Lnk reduce(Mem* MEM, u64 host) {
           clear(MEM, get_loc(term,0), 2);
           return link(MEM, host, U_32(c));
         }
+        break;
       }
       case DP0:
       case DP1: {
