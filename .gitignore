@@ -1,3 +1,8 @@
 .cache/
 bin/*
+tmp/*
+wip/*
 !bin/.keep
+*.o
+*.hi
+.DS_STORE

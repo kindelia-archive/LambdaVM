@@ -4,7 +4,7 @@ import * as C from "./../Runtime/Runtime.ts"
 
 // Reads back a Lambolt term from Runtime's memory
 export function runtime_to_lambolt(MEM: C.Mem, input_term: C.Lnk | null = null, table: {[idx:string]:string}) : string {
-  var term : C.Lnk = input_term ? input_term : C.deref(MEM, 0);
+  var term : C.Lnk = input_term ? input_term : C.ask_lnk(MEM, 0);
   var names : C.MAP<string> = {};
   var count : number = 0;
   var seen : C.MAP<boolean> = {};
@@ -13,44 +13,46 @@ export function runtime_to_lambolt(MEM: C.Mem, input_term: C.Lnk | null = null, 
       seen[term] = true;
       switch (C.get_tag(term)) {
         case C.LAM: {
-          if (C.get_tag(C.get_lnk(MEM, term, 0)) !== C.NIL) {
+          if (C.get_tag(C.ask_arg(MEM, term, 0)) !== C.ERA) {
             names[C.Var(C.get_loc(term,0))] = "x" + (++count);
           }
-          name(C.get_lnk(MEM, term, 1), depth + 1);
+          name(C.ask_arg(MEM, term, 1), depth + 1);
           break;
         }
         case C.APP: {
-          name(C.get_lnk(MEM, term, 0), depth + 1);
-          name(C.get_lnk(MEM, term, 1), depth + 1);
+          name(C.ask_arg(MEM, term, 0), depth + 1);
+          name(C.ask_arg(MEM, term, 1), depth + 1);
           break;
         }
         case C.PAR: {
-          name(C.get_lnk(MEM, term, 0), depth + 1);
-          name(C.get_lnk(MEM, term, 1), depth + 1);
+          name(C.ask_arg(MEM, term, 0), depth + 1);
+          name(C.ask_arg(MEM, term, 1), depth + 1);
           break;
         }
         case C.DP0: {
-          name(C.get_lnk(MEM, term, 2), depth + 1);
+          name(C.ask_arg(MEM, term, 2), depth + 1);
           break;
         }
         case C.DP1: {
-          name(C.get_lnk(MEM, term, 2), depth + 1);
-          break;
-        }
-        case C.CAL:
-        case C.CTR: {
-          var arity = C.get_ari(term);
-          for (var i = 0; i < arity; ++i) {
-            name(C.get_lnk(MEM, term, i), depth + 1);
-          }
+          name(C.ask_arg(MEM, term, 2), depth + 1);
           break;
         }
         case C.OP2: {
-          name(C.get_lnk(MEM, term, 0), depth + 1);
-          name(C.get_lnk(MEM, term, 1), depth + 1);
+          name(C.ask_arg(MEM, term, 0), depth + 1);
+          name(C.ask_arg(MEM, term, 1), depth + 1);
           break;
         }
         case C.U32: {
+          break;
+        }
+        case C.CT0: case C.CT1: case C.CT2: case C.CT3:
+        case C.CT4: case C.CT5: case C.CT6: case C.CT7:
+        case C.CT8: case C.CT9: case C.CTA: case C.CTB:
+        case C.CTC: case C.CTD: case C.CTE: case C.CTF: {
+          var arity = C.get_ari(term);
+          for (var i = 0; i < arity; ++i) {
+            name(C.ask_arg(MEM, term, i), depth + 1);
+          }
           break;
         }
       }
@@ -65,57 +67,46 @@ export function runtime_to_lambolt(MEM: C.Mem, input_term: C.Lnk | null = null, 
       //if (depth > 30) return "(...)";
       switch (C.get_tag(term)) {
         case C.LAM: {
-          let body = go(C.get_lnk(MEM, term, 1), stacks, seen, depth + 1);
+          let body = go(C.ask_arg(MEM, term, 1), stacks, seen, depth + 1);
           let name = "~";
-          if (C.get_tag(C.get_lnk(MEM, term, 0)) !== C.NIL) {
+          if (C.get_tag(C.ask_arg(MEM, term, 0)) !== C.ERA) {
             name = names[C.Var(C.get_loc(term,0))] || "?";
           }
           return "λ" + name + " " + body;
         }
         case C.APP: {
-          let func = go(C.get_lnk(MEM, term, 0), stacks, seen, depth + 1);
-          let argm = go(C.get_lnk(MEM, term, 1), stacks, seen, depth + 1);
+          let func = go(C.ask_arg(MEM, term, 0), stacks, seen, depth + 1);
+          let argm = go(C.ask_arg(MEM, term, 1), stacks, seen, depth + 1);
           return "(" + func + " " + argm + ")"
         }
         case C.PAR: {
-          let col = C.get_col(term);
+          let col = C.get_ext(term);
           if (!stacks[col]) {
             stacks[col] = "";
           }
           if (stacks[col] !== undefined && stacks[col].length > 0) {
             if (stacks[col][0] === "0") {
-              return go(C.get_lnk(MEM, term, 0), {...stacks,[col]:stacks[col].slice(1)}, seen, depth + 1);
+              return go(C.ask_arg(MEM, term, 0), {...stacks,[col]:stacks[col].slice(1)}, seen, depth + 1);
             } else {
-              return go(C.get_lnk(MEM, term, 1), {...stacks,[col]:stacks[col].slice(1)}, seen, depth + 1);
+              return go(C.ask_arg(MEM, term, 1), {...stacks,[col]:stacks[col].slice(1)}, seen, depth + 1);
             }
           } else {
-            let val0 = go(C.get_lnk(MEM, term, 0), stacks, seen, depth + 1);
-            let val1 = go(C.get_lnk(MEM, term, 1), stacks, seen, depth + 1);
+            let val0 = go(C.ask_arg(MEM, term, 0), stacks, seen, depth + 1);
+            let val1 = go(C.ask_arg(MEM, term, 1), stacks, seen, depth + 1);
             return "<" + val0 + " " + val1 + ">"
           }
         }
         case C.DP0: {
-          let col = C.get_col(term);
-          return "" + go(C.get_lnk(MEM, term, 2), {...stacks,[col]:"0"+stacks[col]}, seen, depth + 1);
+          let col = C.get_ext(term);
+          return "" + go(C.ask_arg(MEM, term, 2), {...stacks,[col]:"0"+stacks[col]}, seen, depth + 1);
         }
         case C.DP1: {
-          let col = C.get_col(term);
-          return "" + go(C.get_lnk(MEM, term, 2), {...stacks,[col]:"1"+stacks[col]}, seen, depth + 1);
-        }
-        case C.CAL:
-        case C.CTR: {
-          let func = C.get_fun(term);
-          var arit = C.get_ari(term);
-          let args = [];
-          for (let i = 0; i < arit; ++i) {
-            args.push(go(C.get_lnk(MEM, term, i), stacks, seen, depth + 1));
-          }
-          var name = table[func] || ("$" + String(func));
-          return "(" + name + args.map(x => " " + x).join("") + ")";
+          let col = C.get_ext(term);
+          return "" + go(C.ask_arg(MEM, term, 2), {...stacks,[col]:"1"+stacks[col]}, seen, depth + 1);
         }
         case C.OP2: {
           let oper = (function() {
-            switch (C.get_ope(term)) {
+            switch (C.get_ext(term)) {
               case C.ADD: return "+";
               case C.SUB: return "-";
               case C.MUL: return "*";
@@ -134,20 +125,33 @@ export function runtime_to_lambolt(MEM: C.Mem, input_term: C.Lnk | null = null, 
               case C.NEQ: return "!=";
             }
           })();
-          let val0 = go(C.get_lnk(MEM, term, 0), stacks, seen, depth + 1);
-          let val1 = go(C.get_lnk(MEM, term, 1), stacks, seen, depth + 1);
+          let val0 = go(C.ask_arg(MEM, term, 0), stacks, seen, depth + 1);
+          let val1 = go(C.ask_arg(MEM, term, 1), stacks, seen, depth + 1);
           return "(" + oper + " " + val0 + " " + val1 + ")"
         }
         case C.U32: {
-          return "" + C.get_num(term);
+          return "" + C.get_val(term);
+        }
+        case C.CT0: case C.CT1: case C.CT2: case C.CT3:
+        case C.CT4: case C.CT5: case C.CT6: case C.CT7:
+        case C.CT8: case C.CT9: case C.CTA: case C.CTB:
+        case C.CTC: case C.CTD: case C.CTE: case C.CTF: {
+          let func = C.get_ext(term);
+          var arit = C.get_ari(term);
+          let args = [];
+          for (let i = 0; i < arit; ++i) {
+            args.push(go(C.ask_arg(MEM, term, i), stacks, seen, depth + 1));
+          }
+          var name = table[func] || ("$" + String(func));
+          return "(" + name + args.map(x => " " + x).join("") + ")";
         }
         case C.VAR: {
-          return names[term] || "^"+String(C.get_loc(term,0)); // + "<" + C.show_lnk(C.deref(MEM, C.get_loc(term,0))) + ">";
+          return names[term] || "^"+String(C.get_loc(term,0)); // + "<" + C.show_lnk(C.ask_lnk(MEM, C.get_loc(term,0))) + ">";
         }
         case C.ARG: {
           return "!";
         }
-        case C.NIL: {
+        case C.ERA: {
           return "~";
         }
       }

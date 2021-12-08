@@ -5,7 +5,4 @@
 (Add a   (Zero)) = a
 
 // Reduces on BOTH sides!
-(Main) = (Pair
-  λx (Add x (Succ (Zero)))
-  λx (Add (Succ (Zero)) x)
-)
+(Main) = λx (Add x (Succ (Zero)))

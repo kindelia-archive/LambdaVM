@@ -1,0 +1,14 @@
+(done (E))      = (true)
+(done (O pred)) = (false)
+(done (I pred)) = (done pred)
+
+(inc (E))      = (E)
+(inc (O pred)) = (I pred)
+(inc (I pred)) = (O (inc pred))
+
+(slow n)         = (cont (done n) n)
+(cont (true)  n) = n
+(cont (false) n) = (slow (inc n))
+
+(main) = (slow (O (O (O (O (O (O (O (O (O (E)))))))))))
+
