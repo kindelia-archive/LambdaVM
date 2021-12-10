@@ -115,11 +115,13 @@ export async function run(code: string, opts: any) {
 
   if (normal !== null) {
     console.log("Running...");
-    var gas = normal(mem, 0);
+    var ini = Date.now();
+    var rwt = normal(mem, 0);
     console.log(Convert.runtime_to_lambolt(mem, Runtime.deref(mem,0), numb_table));
     console.log("");
-    console.log("* gas: " + gas);
+    console.log("* gas: " + rwt);
     console.log("* mem: " + mem.lnk.size);
+    console.log("* rwt: " + rwt + " (" + (rwt/((Date.now()-ini)/1000)/1000000).toFixed(2) + "m rwt/s)");
   } else {
     console.log("Couldn't load runtime.");
   }
