@@ -22,7 +22,7 @@ export function compile(file: L.File) {
   var book : R.Book = {};
   for (var group_name in groups) {
     //console.log("- compiling", group_name, name_table[group_name] / R.EXT);
-    book[name_table[group_name] / R.EXT] = compile_group(group_name, groups[group_name][0], groups[group_name][1], name_table, is_call);
+    book[String(name_table[group_name] / R.EXT)] = compile_group(group_name, groups[group_name][0], groups[group_name][1], name_table, is_call);
   }
 
   return book;
@@ -33,7 +33,7 @@ export function compile_group(
   name: string,
   arity: number,
   rules: Array<L.Rule>,
-  name_table: {[name:string]:number},
+  name_table: {[name:string]:bigint},
   is_call: {[name:string]:boolean},
 ): R.Page {
   function compile_group(name: string, arity: number, rules: Array<{rule:L.Rule,uses:{[key:string]:number}}>): R.Page {
@@ -80,7 +80,7 @@ export function compile_group(
           test: [],
           clrs: [],
           cols: [],
-          root: 0,
+          root: 0n,
           body: [],
         }
 
@@ -95,7 +95,7 @@ export function compile_group(
               break;
             }
             case "U32": {
-              page.rules[r].test.push(R.U32 + term.numb);
+              page.rules[r].test.push(R.U32 + BigInt(term.numb));
               break;
             }
             case "Var": {
@@ -122,9 +122,9 @@ export function compile_group(
                 var field = term.args[j];
                 switch (field.$) {
                   case "Var": {
-                    vars[field.name] = R.Out(i, j);
+                    vars[field.name] = R.Out(BigInt(i), BigInt(j));
                     if (!uses[field.name]) {
-                      page.rules[r].cols.push(R.Out(i, j));
+                      page.rules[r].cols.push(R.Out(BigInt(i), BigInt(j)));
                     }
                     break;
                   }
@@ -140,9 +140,9 @@ export function compile_group(
             //   (add (succ a) b) = (succ (add a b))
             //                 /\ this is a var, so here we'll collect it
             case "Var": {
-              vars[term.name] = R.Out(i, 0xFF);
+              vars[term.name] = R.Out(BigInt(i), 0xFFn);
               if (!uses[term.name]) {
-                page.rules[r].cols.push(R.Out(i, 0xFF));
+                page.rules[r].cols.push(R.Out(BigInt(i), 0xFFn));
               }
               page.rules[r].clrs.push(0);
               break;
@@ -163,7 +163,7 @@ export function compile_group(
         // side variables. Great! Now we just need to compile the right-hand.
         
         //console.log("compiling", L.show_term(rule.rhs));
-        page.rules[r].root = compile_term(rule.rhs, uses, page.rules[r].body, 0);
+        page.rules[r].root = compile_term(rule.rhs, uses, page.rules[r].body, 0n);
       } else {
         throw "Invalid left-hand side.";
       }
@@ -174,7 +174,7 @@ export function compile_group(
 
   // Compiles a term (i.e., the right-hand side). It just allocates space for
   // the term and creates the links.
-  function compile_term(term: L.Term, uses:{[key:string]:number}, data: Array<R.Lnk>, loc: number | null) : R.Lnk {
+  function compile_term(term: L.Term, uses:{[key:string]:number}, data: Array<R.Lnk>, loc: bigint | null) : R.Lnk {
     //console.log("compile_term", L.show_term(term));
     switch (term.$) {
       case "Var": {
@@ -183,9 +183,9 @@ export function compile_group(
           if (loc !== null) {
             var lnk = vars[term.name];
             switch (R.get_tag(lnk)) {
-              case R.DP0: data[R.get_val(lnk)+0] = R.Arg(loc); break;
-              case R.DP1: data[R.get_val(lnk)+1] = R.Arg(loc); break;
-              case R.VAR: data[R.get_val(lnk)+0] = R.Arg(loc); break;
+              case R.DP0: data[Number(R.get_val(lnk)+0n)] = R.Arg(loc); break;
+              case R.DP1: data[Number(R.get_val(lnk)+1n)] = R.Arg(loc); break;
+              case R.VAR: data[Number(R.get_val(lnk)+0n)] = R.Arg(loc); break;
             }
           }
           return vars[term.name];
@@ -195,18 +195,18 @@ export function compile_group(
         }
       }
       case "Dup": {
-        var aloc = data.length;
+        var aloc = BigInt(data.length);
         data.length += 3;
         var dupk = (dups++) * R.EXT;
-        vars[term.nam0] = R.Dp0(dupk, aloc + 0);
-        vars[term.nam1] = R.Dp1(dupk, aloc + 0);
+        vars[term.nam0] = R.Dp0(dupk, aloc + 0n);
+        vars[term.nam1] = R.Dp1(dupk, aloc + 0n);
         if (!uses[term.nam0]) {
-          data[aloc + 0] = R.Era();
+          data[Number(aloc + 0n)] = R.Era();
         }
         if (!uses[term.nam1]) {
-          data[aloc + 1] = R.Era();
+          data[Number(aloc + 1n)] = R.Era();
         }
-        data[aloc + 2] = compile_term(term.expr, uses, data, aloc + 2);
+        data[Number(aloc + 2n)] = compile_term(term.expr, uses, data, aloc + 2n);
         return compile_term(term.body, uses, data, loc);
       }
       case "Let": {
@@ -214,27 +214,27 @@ export function compile_group(
         return compile_term(term.body, uses, data, loc);
       }
       case "Lam": {
-        var aloc = data.length;
+        var aloc = BigInt(data.length);
         data.length += 2;
-        vars[term.name] = R.Var(aloc + 0);
-        data[aloc + 1] = compile_term(term.body, uses, data, aloc + 1);
+        vars[term.name] = R.Var(aloc + 0n);
+        data[Number(aloc + 1n)] = compile_term(term.body, uses, data, aloc + 1n);
         if (!uses[term.name]) {
-          data[aloc + 0] = R.Era();
+          data[Number(aloc + 0n)] = R.Era();
         }
-        return R.Lam(aloc + 0);
+        return R.Lam(aloc + 0n);
       }
       case "App": {
-        var aloc = data.length;
+        var aloc = BigInt(data.length);
         data.length += 2;
-        data[aloc + 0] = compile_term(term.func, uses, data, aloc + 0);
-        data[aloc + 1] = compile_term(term.argm, uses, data, aloc + 1);
-        return R.App(aloc + 0);
+        data[Number(aloc + 0n)] = compile_term(term.func, uses, data, aloc + 0n);
+        data[Number(aloc + 1n)] = compile_term(term.argm, uses, data, aloc + 1n);
+        return R.App(aloc + 0n);
       }
       case "Op2": {
-        var aloc = data.length;
+        var aloc = BigInt(data.length);
         data.length += 2;
-        data[aloc + 0] = compile_term(term.val0, uses, data, aloc + 0);
-        data[aloc + 1] = compile_term(term.val1, uses, data, aloc + 1);
+        data[Number(aloc + 0n)] = compile_term(term.val0, uses, data, aloc + 0n);
+        data[Number(aloc + 1n)] = compile_term(term.val1, uses, data, aloc + 1n);
         var oper = (function (oper: string) {
           switch (oper) {
             case "ADD": return R.ADD;
@@ -256,27 +256,27 @@ export function compile_group(
           }
           return R.ADD;
         })(term.oper);
-        return R.Op2(oper, aloc + 0);
+        return R.Op2(oper, aloc + 0n);
       }
       case "U32": {
-        return R.U_32(term.numb);
+        return R.U_32(BigInt(term.numb));
       }
       case "Ctr": {
-        var aloc = data.length;
+        var aloc = BigInt(data.length);
         data.length += term.args.length;
         for (var i = 0; i < term.args.length; ++i) {
-          data[aloc + i] = compile_term(term.args[i], uses, data, aloc + i);
+          data[Number(aloc + BigInt(i))] = compile_term(term.args[i], uses, data, aloc + BigInt(i));
         }
         if (is_call[term.name]) {
-          return R.Cal(term.args.length, name_table[term.name], aloc + 0);
+          return R.Cal(term.args.length, name_table[term.name], aloc + 0n);
         } else {
-          return R.Ctr(term.args.length, name_table[term.name], aloc + 0);
+          return R.Ctr(term.args.length, name_table[term.name], aloc + 0n);
         }
       }
     }
   }
 
-  var dups = 0;
+  var dups = 0n;
   var vars : {[name: string]: R.Lnk} = {};
   var uses : {[name: string]: number} = {};
   return compile_group(name, arity, rules.map(sanitize));

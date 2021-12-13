@@ -3,8 +3,8 @@ import {EXT} from "./../Runtime/Runtime.ts"
 
 // Generates a name table for a whole program. That table links constructor
 // names (such as `cons` and `succ`) to small ids (such as `0` and `1`).
-export function gen_name_table(file: L.File) : {[name: string]: number} {
-  var table : {[name: string]: number} = {};
+export function gen_name_table(file: L.File) : {[name: string]: bigint} {
+  var table : {[name: string]: bigint} = {};
   var fresh : number = 0;
   function find_ctrs(term: L.Term) {
     switch (term.$) {
@@ -33,9 +33,9 @@ export function gen_name_table(file: L.File) : {[name: string]: number} {
       case "Ctr": {
         if (table[term.name] === undefined) {
           if (term.name[0] === "." && !isNaN(Number(term.name.slice(1)))) {
-            table[term.name] = Number(term.name.slice(1)) * EXT;
+            table[term.name] = BigInt(term.name.slice(1)) * EXT;
           } else {
-            table[term.name] = (fresh++) * EXT;
+            table[term.name] = BigInt(fresh++) * EXT;
           }
         }
         for (var arg of term.args) {

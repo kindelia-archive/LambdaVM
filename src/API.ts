@@ -91,13 +91,14 @@ function c_add_dynbook(book: Runtime.Book) {
   function prepare_lnks(lnks: Array<Runtime.Lnk>): Uint8Array {
     var data = new BigUint64Array(lnks.length);
     for (var i = 0; i < lnks.length; ++i) {
-      var lnk = lnks[i];
-      var num = 0n;
-      var num = num | BigInt(Runtime.get_tag(lnk));
-      var num = num | BigInt(Runtime.get_ext(lnk));
-      var num = num | BigInt(Runtime.get_val(lnk));
-      var num = num | (Runtime.is_cal(lnk) ? 0x8000000000000000n : 0n);
-      data[i] = num;
+      data[i] = lnks[i];
+      //var lnk = lnks[i];
+      //var num = 0n;
+      //var num = num | BigInt(Runtime.get_tag(lnk));
+      //var num = num | BigInt(Runtime.get_ext(lnk));
+      //var num = num | BigInt(Runtime.get_val(lnk));
+      //var num = num | (Runtime.is_cal(lnk) ? 0x8000000000000000n : 0n);
+      //data[i] = num;
     }
     return new Uint8Array(data.buffer);
   }
@@ -125,7 +126,7 @@ function c_add_dynbook(book: Runtime.Book) {
     // Adds this page's rules
     for (var rule_index = 0; rule_index < page.rules.length; ++rule_index) {
       var rule      = page.rules[rule_index];
-      var test_data = prepare_numbers(rule.test);
+      var test_data = prepare_lnks(rule.test);
       var test_size = rule.test.length;
       var clrs_data = prepare_numbers(rule.clrs);
       var clrs_size = rule.clrs.length;
@@ -165,56 +166,7 @@ function c_add_dynbook(book: Runtime.Book) {
 
 function c_normal(mem: Runtime.Mem, host: number): number {
   var dylib = c_load_dylib();
-
-  //function js_to_c(f64: Float64Array, size: number): Float64Array {
-    //var u64 = new BigInt64Array(size);
-    //for (var i = 0; i < size; ++i) {
-      //var lnk = f64[i];
-      //var num = 0n;
-      //var num = num | BigInt(Runtime.get_tag(lnk));
-      //var num = num | BigInt(Runtime.get_ext(lnk));
-      //var num = num | BigInt(Runtime.get_val(lnk));
-      //var num = num | BigInt(Runtime.is_cal(lnk) ? 0x8000000000000000n : 0n);
-      //u64[i] = num;
-    //}
-    //return new Float64Array(u64.buffer);
-  //}
-
-  //function c_to_js(arr: Float64Array, size: number): Float64Array {
-    //var u64 = new BigInt64Array(arr.buffer);
-    //var f64 = new Float64Array(size);
-    //for (var i = 0; i < size; ++i) {
-      //var tag = Number(u64[i] & 0x001F000000000000n);
-      //var ext = Number(u64[i] & 0x0000FFFF00000000n);
-      //var val = Number(u64[i] & 0x00000000FFFFFFFFn);
-      //var ict = u64[i] >= 0n ? 1 : -1;
-      //f64[i] = ict * (tag + ext + val);
-    //}
-    //return f64;
-  //}
-
-  //console.log("size:" + mem.size);
-  //console.log("data:", mem.data.slice(0,2));
-  
-
-  //var ini = Date.now();
-  //mem.data.set(js_to_c(mem.data, mem.size));
-  //console.log("a", Date.now() - ini);
-
-  //var ini = Date.now();
-  
-  mem.size = dylib.symbols.normal_ffi(new Uint8Array(mem.data.buffer), mem.size, host) as number;
-
-  //mem.size = 1;
-  //console.log("b", Date.now() - ini);
-
-  //var ini = Date.now();
-  //mem.data.set(c_to_js(mem.data, mem.size));
-  //console.log("c", Date.now() - ini, mem.size);
-
-  //console.log("size:" + mem.size);
-  //console.log("data:", mem.data.slice(0,2));
-
+  mem.size = dylib.symbols.normal_ffi(new Uint8Array(mem.data.buffer), mem.size, Number(host)) as number;
   return dylib.symbols.get_gas() as number;
 }
 
@@ -269,7 +221,7 @@ export async function run(code: string, opts: any) {
   // ---------------------
 
   var mem = Runtime.init();
-  Runtime.link(mem, 0, Runtime.Cal(0, name_table["Main"]||0, 0));
+  Runtime.link(mem, 0n, Runtime.Cal(0, name_table["Main"]||0n, 0n));
 
   // Evaluates main()
   // ----------------
@@ -277,8 +229,9 @@ export async function run(code: string, opts: any) {
   if (normal !== null) {
     var ini = Date.now();
     //console.log(Convert.runtime_to_lambolt(mem, Runtime.ask_lnk(mem,0), numb_table));
-    var rwt = (normal as any)(mem, 0);
-    console.log(Readback.runtime_to_lambolt(mem, Runtime.ask_lnk(mem,0), numb_table));
+    var rwt = (normal as any)(mem, 0n);
+    //var rwt = 0;
+    console.log(Readback.runtime_to_lambolt(mem, Runtime.ask_lnk(mem,0n), numb_table));
     console.log("");
     console.log("* rwt: " + rwt + " (" + (rwt/((Date.now()-ini)/1000)/1000000).toFixed(2) + "m rwt/s)");
     console.log("* mem: " + mem.size);

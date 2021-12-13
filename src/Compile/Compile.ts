@@ -22,7 +22,7 @@ export function compile(file: L.File, target: string, template: string) {
   // Compiles constructor ids.
   var constructor_ids = "";
   for (var name in name_table) {
-    constructor_ids += CONST(target) + " " + compile_constructor_name(name) + " = " + name_table[name] + ";\n";
+    constructor_ids += CONST(target) + " " + compile_constructor_name(name) + " = " + U64(target,name_table[name]) + ";\n";
   }
 
   // Compiles each group's rewrite rules.
@@ -44,7 +44,7 @@ export function compile_group(
   name: string,
   arity: number,
   rules: Array<L.Rule>,
-  name_table: {[name:string]:number},
+  name_table: {[name:string]:bigint},
   is_call: {[name:string]:boolean},
   target: string,
   tab: number
@@ -94,7 +94,7 @@ export function compile_group(
     for (var {rule,uses} of rules) {
       if (rule.lhs.$ === "Ctr" && rule.lhs.args.length === arity) {
 
-        var clears = ["clear(mem, get_loc(term, 0), "+rule.lhs.args.length+")"];
+        var clears = ["clear(mem, get_loc(term, "+i+"), "+rule.lhs.args.length+")"];
         var collects = [];
 
         // Checks if this rule matches and enters its branch. That is,
@@ -109,7 +109,7 @@ export function compile_group(
               break;
             }
             case "U32": {
-              conds.push("get_val(LNK_"+i+") == "+term.numb);
+              conds.push("get_val(LNK_"+i+") == "+U64(target,term.numb));
               break;
             }
           }
@@ -204,17 +204,17 @@ export function compile_group(
         var dupn = fresh("col");
         var dupk = dups++;
         text += line(tab, VAR(target) + " " + name + " = alloc(mem, 3);");
-        text += line(tab, VAR(target) + " " + dupn + " = " + dupk + " * EXT;");
+        text += line(tab, VAR(target) + " " + dupn + " = " + U64(target,dupk) + " * EXT;");
         args[term.nam0] = "Dp0("+dupn+", "+name+")";
         args[term.nam1] = "Dp1("+dupn+", "+name+")";
         if (!uses[term.nam0]) {
-          text += line(tab, "link(mem, " + name + "+0, Era());");
+          text += line(tab, "link(mem, " + name + "+"+U64(target,0)+", Era());");
         }
         if (!uses[term.nam1]) {
-          text += line(tab, "link(mem, " + name + "+1, Era());");
+          text += line(tab, "link(mem, " + name + "+"+U64(target,1)+", Era());");
         }
         var expr = compile_term(term.expr, tab, uses);
-        text += line(tab, "link(mem, "+name+"+2, "+expr+");");
+        text += line(tab, "link(mem, "+name+"+"+U64(target,2)+", "+expr+");");
         var body = compile_term(term.body, tab, uses);
         return body;
       case "Let":
@@ -228,17 +228,17 @@ export function compile_group(
         args[term.name] = "Var("+name+")";
         var body = compile_term(term.body, tab, uses);
         if (!uses[term.name]) {
-          text += line(tab, "link(mem, " + name+"+0, Era());");
+          text += line(tab, "link(mem, " + name+"+"+U64(target,0)+", Era());");
         }
-        text += line(tab, "link(mem, " + name+"+1, " + body + ");");
+        text += line(tab, "link(mem, " + name+"+"+U64(target,1)+", " + body + ");");
         return "Lam(" + name + ")";
       case "App":
         var name = fresh("app");
         var func = compile_term(term.func, tab, uses);
         var argm = compile_term(term.argm, tab, uses);
         text += line(tab, VAR(target) + " " + name + " = alloc(mem, 2);");
-        text += line(tab, "link(mem, " + name+"+0, " + func + ");");
-        text += line(tab, "link(mem, " + name+"+1, " + argm + ");");
+        text += line(tab, "link(mem, " + name+"+"+U64(target,0)+", " + func + ");");
+        text += line(tab, "link(mem, " + name+"+"+U64(target,1)+", " + argm + ");");
         return "App(" + name + ")";
       case "Ctr":
         var ctr_args : Array<string> = [];
@@ -248,7 +248,7 @@ export function compile_group(
         var name = fresh("ctr");
         text += line(tab, VAR(target) + " " + name + " = alloc(mem, " + ctr_args.length + ");");
         for (var i = 0; i < ctr_args.length; ++i) {
-          text += line(tab, "link(mem, " + name+"+"+i + ", " + ctr_args[i] + ");");
+          text += line(tab, "link(mem, " + name+"+"+U64(target,i) + ", " + ctr_args[i] + ");");
         }
         return (is_call[term.name] ? "Cal" : "Ctr") + "(" + ctr_args.length + ", " + (compile_constructor_name(term.name)||0) + ", " + name + ")";
       case "Op2":
@@ -256,11 +256,11 @@ export function compile_group(
         var val0 = compile_term(term.val0, tab, uses);
         var val1 = compile_term(term.val1, tab, uses);
         text += line(tab, VAR(target) + " " + name + " = alloc(mem, 2);");
-        text += line(tab, "link(mem, " + name+"+0, " + val0 + ");");
-        text += line(tab, "link(mem, " + name+"+1, " + val1 + ");");
+        text += line(tab, "link(mem, " + name+"+"+U64(target,0)+", " + val0 + ");");
+        text += line(tab, "link(mem, " + name+"+"+U64(target,1)+", " + val1 + ");");
         return "Op2(" + term.oper.toUpperCase() + ", " + name + ")";
       case "U32":
-        return "U_32(" + term.numb + ")";
+        return "U_32(" + U64(target,term.numb) + ")";
     }
   }
 
@@ -311,6 +311,14 @@ function VAR(target: string) {
     case "ts": return "var";
     case "c": return "u64";
   }
+}
+
+function U64(target: string, num: number | bigint): string {
+  switch (target) {
+    case "ts": return "" + num + "n";
+    case "c": return "" + num;
+  }
+  return "0";
 }
 
 function GAS(target: string) {

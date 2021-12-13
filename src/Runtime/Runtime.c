@@ -12,7 +12,7 @@ typedef unsigned long long int u64;
 
 const u64 VAL = 1;
 const u64 EXT = 0x100000000; 
-const u64 TAG = 0x1000000000000;
+const u64 TAG = 0x100000000000000;
 
 const u64 NIL = 0x00 * TAG;
 const u64 DP0 = 0x02 * TAG;
@@ -23,27 +23,44 @@ const u64 ERA = 0x06 * TAG;
 const u64 LAM = 0x07 * TAG;
 const u64 APP = 0x08 * TAG;
 const u64 PAR = 0x09 * TAG;
-const u64 CT0 = 0x0A * TAG;
-const u64 CT1 = 0x0B * TAG;
-const u64 CT2 = 0x0C * TAG;
-const u64 CT3 = 0x0D * TAG;
-const u64 CT4 = 0x0E * TAG;
-const u64 CT5 = 0x0F * TAG;
-const u64 CT6 = 0x10 * TAG;
-const u64 CT7 = 0x11 * TAG;
-const u64 CT8 = 0x12 * TAG;
-const u64 CT9 = 0x13 * TAG;
-const u64 CTA = 0x14 * TAG;
-const u64 CTB = 0x15 * TAG;
-const u64 CTC = 0x16 * TAG;
-const u64 CTD = 0x17 * TAG;
-const u64 CTE = 0x18 * TAG;
-const u64 CTF = 0x19 * TAG;
-const u64 CTG = 0x1A * TAG;
-const u64 OP2 = 0x1B * TAG;
-const u64 U32 = 0x1C * TAG;
-const u64 F32 = 0x1D * TAG;
-const u64 OUT = 0x1F * TAG;
+const u64 CT0 = 0x20 * TAG;
+const u64 CT1 = 0x21 * TAG;
+const u64 CT2 = 0x22 * TAG;
+const u64 CT3 = 0x23 * TAG;
+const u64 CT4 = 0x24 * TAG;
+const u64 CT5 = 0x25 * TAG;
+const u64 CT6 = 0x26 * TAG;
+const u64 CT7 = 0x27 * TAG;
+const u64 CT8 = 0x28 * TAG;
+const u64 CT9 = 0x29 * TAG;
+const u64 CTA = 0x2A * TAG;
+const u64 CTB = 0x2B * TAG;
+const u64 CTC = 0x2C * TAG;
+const u64 CTD = 0x2D * TAG;
+const u64 CTE = 0x2E * TAG;
+const u64 CTF = 0x2F * TAG;
+const u64 CTG = 0x30 * TAG;
+const u64 FN0 = 0x40 * TAG;
+const u64 FN1 = 0x41 * TAG;
+const u64 FN2 = 0x42 * TAG;
+const u64 FN3 = 0x43 * TAG;
+const u64 FN4 = 0x44 * TAG;
+const u64 FN5 = 0x45 * TAG;
+const u64 FN6 = 0x46 * TAG;
+const u64 FN7 = 0x47 * TAG;
+const u64 FN8 = 0x48 * TAG;
+const u64 FN9 = 0x49 * TAG;
+const u64 FNA = 0x4A * TAG;
+const u64 FNB = 0x4B * TAG;
+const u64 FNC = 0x4C * TAG;
+const u64 FND = 0x4D * TAG;
+const u64 FNE = 0x4E * TAG;
+const u64 FNF = 0x4F * TAG;
+const u64 FNG = 0x50 * TAG;
+const u64 OP2 = 0x60 * TAG;
+const u64 U32 = 0xF0 * TAG;
+const u64 F32 = 0xF1 * TAG;
+const u64 OUT = 0xFF * TAG;
 
 const u64 ADD = 0x00 * EXT;
 const u64 SUB = 0x01 * EXT;
@@ -191,124 +208,38 @@ Lnk Nil() {
   return NIL;
 }
 
-Lnk Ct0(u64 fun, u64 pos) {
-  return CT0 | fun | pos;
+Lnk Ctr(u64 ari, u64 fun, u64 pos) {
+  return (CT0 + ari * TAG) | fun | pos;
 }
 
-Lnk Ct1(u64 fun, u64 pos) {
-  return CT1 | fun | pos;
-}
-
-Lnk Ct2(u64 fun, u64 pos) {
-  return CT2 | fun | pos;
-}
-
-Lnk Ct3(u64 fun, u64 pos) {
-  return CT3 | fun | pos;
-}
-
-Lnk Ct4(u64 fun, u64 pos) {
-  return CT4 | fun | pos;
-}
-
-Lnk Ct5(u64 fun, u64 pos) {
-  return CT5 | fun | pos;
-}
-
-Lnk Ct6(u64 fun, u64 pos) {
-  return CT6 | fun | pos;
-}
-
-Lnk Ct7(u64 fun, u64 pos) {
-  return CT7 | fun | pos;
-}
-
-Lnk Ct8(u64 fun, u64 pos) {
-  return CT8 | fun | pos;
-}
-
-Lnk Ct9(u64 fun, u64 pos) {
-  return CT9 | fun | pos;
-}
-
-Lnk CtA(u64 fun, u64 pos) {
-  return CTA | fun | pos;
-}
-
-Lnk CtB(u64 fun, u64 pos) {
-  return CTB | fun | pos;
-}
-
-Lnk CtC(u64 fun, u64 pos) {
-  return CTC | fun | pos;
-}
-
-Lnk CtD(u64 fun, u64 pos) {
-  return CTD | fun | pos;
-}
-
-Lnk CtE(u64 fun, u64 pos) {
-  return CTE | fun | pos;
-}
-
-Lnk CtF(u64 fun, u64 pos) {
-  return CTF | fun | pos;
-}
-
-Lnk CtG(u64 fun, u64 pos) {
-  return CTG | fun | pos;
+Lnk Cal(u64 ari, u64 fun, u64 pos) { 
+  return (FN0 + ari * TAG) | fun | pos;
 }
 
 Lnk Out(u64 arg, u64 fld) {
   return OUT | (arg << 8) | fld;
 }
 
-Lnk Ctr(u64 ari, u64 fun, u64 pos) {
-  return (CT0 + ari * TAG) | fun | pos;
-  //switch (ari) {
-    //case 0x00: return Ct0(fun, pos);
-    //case 0x01: return Ct1(fun, pos);
-    //case 0x02: return Ct2(fun, pos);
-    //case 0x03: return Ct3(fun, pos);
-    //case 0x04: return Ct4(fun, pos);
-    //case 0x05: return Ct5(fun, pos);
-    //case 0x06: return Ct6(fun, pos);
-    //case 0x07: return Ct7(fun, pos);
-    //case 0x08: return Ct8(fun, pos);
-    //case 0x09: return Ct9(fun, pos);
-    //case 0x0A: return CtA(fun, pos);
-    //case 0x0B: return CtB(fun, pos);
-    //case 0x0C: return CtC(fun, pos);
-    //case 0x0D: return CtD(fun, pos);
-    //case 0x0E: return CtE(fun, pos);
-    //case 0x0F: return CtF(fun, pos);
-    //case 0x10: return CtG(fun, pos);
-  //}
-  //return 0;
-}
-
-Lnk Cal(u64 ari, u64 fun, u64 pos) { 
-  return 0x8000000000000000 | Ctr(ari, fun, pos);
-}
-
 u64 get_tag(Lnk lnk) {
-  return lnk & 0x001F000000000000;
+  return lnk & 0xFF00000000000000;
 }
 
 u64 get_ext(Lnk lnk) {
-  return lnk & 0x0000FFFF00000000;
+  return lnk & 0x00FFFFFF00000000;
 }
 
 u64 get_val(Lnk lnk) {
   return lnk & 0x00000000FFFFFFFF;
 }
 
-u64 is_cal(Lnk lnk) {
-  return (lnk & 0x8000000000000000) > 0 ? 1 : 0;
-}
-
 u64 get_ari(Lnk lnk) {
-  return (get_tag(lnk) - CT0) >> 48;
+  if (lnk >= CT0 && lnk <= CTG) {
+    return (get_tag(lnk) - CT0) / TAG;
+  }
+  if (lnk >= FN0 && lnk <= FNG) {
+    return (get_tag(lnk) - FN0) / TAG;
+  }
+  return 0;
 }
 
 u64 get_loc(Lnk lnk, u64 arg) {
@@ -326,7 +257,7 @@ Lnk ask_lnk(Mem* mem, u64 loc) {
 u64 link(Mem* mem, u64 loc, Lnk lnk) {
   array_write(mem, loc, lnk);
   if (get_tag(lnk) <= VAR) {
-    array_write(mem, get_loc(lnk, (get_tag(lnk) >> 48) & 1), Arg(loc));
+    array_write(mem, get_loc(lnk, get_tag(lnk) == DP1 ? 1 : 0), Arg(loc));
   }
   return lnk;
 }
@@ -376,6 +307,23 @@ void debug_print_lnk(Lnk x) {
     case CTE: printf("CTE"); break;
     case CTF: printf("CTF"); break;
     case CTG: printf("CTG"); break;
+    case FN0: printf("FN0"); break;
+    case FN1: printf("FN1"); break;
+    case FN2: printf("FN2"); break;
+    case FN3: printf("FN3"); break;
+    case FN4: printf("FN4"); break;
+    case FN5: printf("FN5"); break;
+    case FN6: printf("FN6"); break;
+    case FN7: printf("FN7"); break;
+    case FN8: printf("FN8"); break;
+    case FN9: printf("FN9"); break;
+    case FNA: printf("FNA"); break;
+    case FNB: printf("FNB"); break;
+    case FNC: printf("FNC"); break;
+    case FND: printf("FND"); break;
+    case FNE: printf("FNE"); break;
+    case FNF: printf("FNF"); break;
+    case FNG: printf("FNG"); break;
     case OP2: printf("OP2"); break;
     case U32: printf("U32"); break;
     case F32: printf("F32"); break;
@@ -436,10 +384,10 @@ void collect(Mem* mem, Lnk term) {
     case U32: {
       break;
     }
-    case CT0: case CT1: case CT2: case CT3:
-    case CT4: case CT5: case CT6: case CT7:
-    case CT8: case CT9: case CTA: case CTB:
-    case CTC: case CTD: case CTE: case CTF: {
+    case CT0: case CT1: case CT2: case CT3: case CT4: case CT5: case CT6: case CT7:
+    case CT8: case CT9: case CTA: case CTB: case CTC: case CTD: case CTE: case CTF: case CTG:
+    case FN0: case FN1: case FN2: case FN3: case FN4: case FN5: case FN6: case FN7:
+    case FN8: case FN9: case FNA: case FNB: case FNC: case FND: case FNE: case FNF: case FNG: {
       u64 arity = get_ari(term);
       for (u64 i = 0; i < arity; ++i) {
         collect(mem, ask_arg(mem,term,i));
@@ -620,10 +568,10 @@ Lnk let_ctr(u64 tid, Mem* mem, u64 host, Lnk term, Lnk arg0) {
   u64 func = get_ext(arg0);
   u64 arit = get_ari(arg0);
   if (arit == 0) {
-    subst(mem, ask_arg(mem,term,0), Ct0(func, 0));
-    subst(mem, ask_arg(mem,term,1), Ct0(func, 0));
+    subst(mem, ask_arg(mem,term,0), Ctr(0, func, 0));
+    subst(mem, ask_arg(mem,term,1), Ctr(0, func, 0));
     clear(mem, get_loc(term,0), 3);
-    u64 done = link(mem, host, Ct0(func, 0));
+    u64 done = link(mem, host, Ctr(0, func, 0));
     return done;
   } else {
     u64 ctr0 = get_loc(arg0,0);
@@ -666,18 +614,14 @@ Lnk cal_ctrs(
   //printf("\n");
   for (u64 i = 0; i < size; ++i) {
     u64 lnk = body.data[i];
-    //printf("-- %llx: ", i);
-    //debug_print_lnk(lnk);
-    //printf("\n");
+    //printf("-- %llx: ", i); //debug_print_lnk(lnk); //printf("\n");
     if (get_tag(lnk) == OUT) {
       u64 arg = (lnk >> 8) & 0xFF;
       u64 fld = (lnk >> 0) & 0xFF;
       u64 out = fld == 0xFF ? args.data[arg] : ask_arg(mem, args.data[arg], fld);
       link(mem, aloc + i, out);
-      //printf("-- link  to: %llu\n", aloc + i);
     } else {
       array_write(mem, aloc + i, lnk + (get_tag(lnk) < U32 ? aloc : 0));
-      //printf("-- write to: %llu\n", aloc + i);
     }
   }
   u64 root_lnk;
@@ -707,7 +651,7 @@ Lnk cal_ctrs(
 Lnk reduce(u64 tid, Mem* mem, u64 host) {
   while (1) {
     u64 term = ask_lnk(mem, host);
-    //printf("reduce %llu:%llu:%llu %llu\n", get_tag(term)/TAG, get_ext(term)/EXT, get_val(term), is_cal(term));
+    //printf("reduce %llu:%llu:%llu", get_tag(term)/TAG, get_ext(term)/EXT, get_val(term));
     switch (get_tag(term)) {
       case APP: {
         u64 arg0 = reduce(tid, mem, get_loc(term,0));
@@ -743,7 +687,7 @@ Lnk reduce(u64 tid, Mem* mem, u64 host) {
           let_u32(tid, mem, host, term, arg0);
           continue;
         }
-        if (get_tag(arg0) >= CT0 && get_tag(arg0) <= CTF && !is_cal(term)) {
+        if (get_tag(arg0) >= CT0 && get_tag(arg0) <= CTF) {
           return let_ctr(tid, mem, host, term, arg0);
         }
         break;
@@ -762,74 +706,69 @@ Lnk reduce(u64 tid, Mem* mem, u64 host) {
         }
         break;
       }
-      case CT0: case CT1: case CT2: case CT3:
-      case CT4: case CT5: case CT6: case CT7:
-      case CT8: case CT9: case CTA: case CTB:
-      case CTC: case CTD: case CTE: case CTF: {
-        //printf("- ctr\n");
-        if (is_cal(term)) {
-          //printf("- cal\n");
-          u64 fun = get_ext(term);
-          //printf("- call fun %llu\n", fun);
+      case FN0: case FN1: case FN2: case FN3: case FN4: case FN5: case FN6: case FN7:
+      case FN8: case FN9: case FNA: case FNB: case FNC: case FND: case FNE: case FNF: case FNG: {
+        //printf("- cal\n");
+        u64 fun = get_ext(term);
+        //printf("- call fun %llu\n", fun);
 
-          // Static rules
-          // ------------
-          
-          switch (fun)
-          //GENERATED_REWRITE_RULES_START//
-          {
+        // Static rules
+        // ------------
+        
+        switch (fun)
+        //GENERATED_REWRITE_RULES_START//
+        {
 //GENERATED_REWRITE_RULES//
-          }
-          //GENERATED_REWRITE_RULES_END//
+        }
+        //GENERATED_REWRITE_RULES_END//
 
-          // Dynamic rules
-          // -------------
+        // Dynamic rules
+        // -------------
 
-          u64 page_index = fun / EXT;
-          Page page = BOOK[page_index];
-          //printf("- BOOK[%llu].valid %llu\n", page_index, BOOK[page_index].valid);
-          if (page.valid == 1) {
-            //printf("- entering page...\n");
-            u64 args_data[page.match.size];
-            //printf("?a\n");
-            for (u64 arg_index = 0; arg_index < page.match.size; ++arg_index) {
-              //printf("- strict arg %llu\n", arg_index);
-              if (page.match.data[arg_index] > 0) {
-                args_data[arg_index] = reduce(tid, mem, get_loc(term, arg_index));
-              } else {
-                args_data[arg_index] = ask_lnk(mem, get_loc(term, arg_index));
-              }
+        u64 page_index = fun / EXT;
+        Page page = BOOK[page_index];
+        //printf("- BOOK[%llu].valid %llu\n", page_index, BOOK[page_index].valid);
+        if (page.valid == 1) {
+          //printf("- entering page...\n");
+          u64 args_data[page.match.size];
+          //printf("?a\n");
+          for (u64 arg_index = 0; arg_index < page.match.size; ++arg_index) {
+            //printf("- strict arg %llu\n", arg_index);
+            if (page.match.data[arg_index] > 0) {
+              args_data[arg_index] = reduce(tid, mem, get_loc(term, arg_index));
+            } else {
+              args_data[arg_index] = ask_lnk(mem, get_loc(term, arg_index));
             }
-            //printf("- page has: %llu rules\n", page.count);
-            //printf("?b\n");
-            u64 matched = 0;
-            for (u64 rule_index = 0; rule_index < page.count; ++rule_index) {
-              //printf("- trying to match rule %llu\n", rule_index);
-              Rule rule = page.rules[rule_index];
-              matched = 1;
-              for (u64 arg_index = 0; arg_index < rule.test.size; ++arg_index) {
-                u64 value = rule.test.data[arg_index];
-                if (get_tag(value) == CT0 && get_ext(args_data[arg_index]) != get_ext(value)) {
-                  //printf("- no match ctr %llu | %llu %llu\n", arg_index, get_ext(args_data[arg_index])/EXT, value/EXT);
-                  matched = 0;
-                  break;
-                }
-                if (get_tag(value) == U32 && get_val(args_data[arg_index]) != get_val(value)) {
-                  //printf("- no match num %llu\n", arg_index);
-                  matched = 0;
-                  break;
-                }
+          }
+          //printf("- page has: %llu rules\n", page.count);
+          //printf("?b\n");
+          u64 matched = 0;
+          for (u64 rule_index = 0; rule_index < page.count; ++rule_index) {
+            //printf("- trying to match rule %llu\n", rule_index);
+            Rule rule = page.rules[rule_index];
+            matched = 1;
+            for (u64 arg_index = 0; arg_index < rule.test.size; ++arg_index) {
+              u64 value = rule.test.data[arg_index];
+              if (get_tag(value) == CT0 && get_ext(args_data[arg_index]) != get_ext(value)) {
+                //printf("- no match ctr %llu | %llu %llu\n", arg_index, get_ext(args_data[arg_index])/EXT, value/EXT);
+                matched = 0;
+                break;
               }
-              if (matched) {
-                Arr args = (Arr){page.match.size, args_data};
-                //printf("cal_ctrs\n");
-                cal_ctrs(tid, mem, host, rule.clrs, rule.cols, rule.root, rule.body, term, args);
+              if (get_tag(value) == U32 && get_val(args_data[arg_index]) != get_val(value)) {
+                //printf("- no match num %llu\n", arg_index);
+                matched = 0;
                 break;
               }
             }
             if (matched) {
-              continue;
+              Arr args = (Arr){page.match.size, args_data};
+              //printf("cal_ctrs\n");
+              cal_ctrs(tid, mem, host, rule.clrs, rule.cols, rule.root, rule.body, term, args);
+              break;
             }
+          }
+          if (matched) {
+            continue;
           }
         }
         break;
@@ -883,29 +822,25 @@ Lnk normal_cont(u64 tid, Mem* mem, u64 host, u64* seen) {
         link(mem, get_loc(term,2), normal_cont(tid, mem, get_loc(term,2), seen));
         return term;
       }
-      case CT0: case CT1: case CT2: case CT3:
-      case CT4: case CT5: case CT6: case CT7:
-      case CT8: case CT9: case CTA: case CTB:
-      case CTC: case CTD: case CTE: case CTF: {
-        if (!is_cal(term)) {
-          u64 arity = (u64)get_ari(term);
-          if (CAN_SPAWN_WORKERS && arity > 1 && arity <= MAX_WORKERS) {
-            CAN_SPAWN_WORKERS = 0;
-            for (u64 t = 0; t < arity; ++t) {
-              normal_fork(t, get_loc(term,t));
-            }
-            for (u64 t = 0; t < arity; ++t) {
-              normal_join(t);
-            }
-          } else {
-            for (u64 i = 0; i < arity; ++i) {
-              link(mem, get_loc(term,i), normal_cont(tid, mem, get_loc(term,i), seen));
-            }
+      case CT0: case CT1: case CT2: case CT3: case CT4: case CT5: case CT6: case CT7:
+      case CT8: case CT9: case CTA: case CTB: case CTC: case CTD: case CTE: case CTF: case CTG:
+      case FN0: case FN1: case FN2: case FN3: case FN4: case FN5: case FN6: case FN7:
+      case FN8: case FN9: case FNA: case FNB: case FNC: case FND: case FNE: case FNF: case FNG: {
+        u64 arity = (u64)get_ari(term);
+        if (CAN_SPAWN_WORKERS && arity > 1 && arity <= MAX_WORKERS) {
+          CAN_SPAWN_WORKERS = 0;
+          for (u64 t = 0; t < arity; ++t) {
+            normal_fork(t, get_loc(term,t));
           }
-          return term;
+          for (u64 t = 0; t < arity; ++t) {
+            normal_join(t);
+          }
         } else {
-          return term;
+          for (u64 i = 0; i < arity; ++i) {
+            link(mem, get_loc(term,i), normal_cont(tid, mem, get_loc(term,i), seen));
+          }
         }
+        return term;
       }
       default: {
         return term;

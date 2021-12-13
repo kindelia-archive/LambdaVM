@@ -1,20 +1,11 @@
-//(Main) =
-  //(λf λx (f (f x)) λf λx (f (f x)))
-
-//(Add (Succ a) b) = (Succ (Add a b))
-//(Add a (Succ b)) = (Succ (Add a b))
-//(Add (Zero)   b) = b
-//(Add a   (Zero)) = a
-
-//(Foo a b) = (Bar (+ a b) (* a b))
-
 (Main) =
+  //(λf λx (f (f x)) λf λx (f (f x)))
   let y = λf ((λr (f (r r))) (λr (f (r r))))
   let s = λn λz λs (s n)
   let z = λz λs z
   let f = (y λslow λn (n (λx x) λpred((slow pred) (slow pred))))
   (f 
-    //(s (s
+    (s (s (s (s (s
     (s (s (s (s
     (s (s (s (s
     (s (s (s (s
@@ -24,5 +15,6 @@
     ))))
     ))))
     ))))
-    //))
+    )))))
   )
+
