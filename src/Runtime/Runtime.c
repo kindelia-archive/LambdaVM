@@ -784,12 +784,12 @@ Lnk reduce(u64 tid, Mem* mem, u64 host) {
             matched = 1;
             for (u64 arg_index = 0; arg_index < rule.test.size; ++arg_index) {
               u64 value = rule.test.data[arg_index];
-              if (get_tag(value) == CT0 && get_ext(args_data[arg_index]) != get_ext(value)) {
+              if (get_tag(value) == CT0 && !(get_tag(args_data[arg_index]) >= CT0 && get_tag(args_data[arg_index]) <= CTG && get_ext(args_data[arg_index]) == get_ext(value))) {
                 //printf("- no match ctr %llu | %llu %llu\n", arg_index, get_ext(args_data[arg_index])/EXT, value/EXT);
                 matched = 0;
                 break;
               }
-              if (get_tag(value) == U32 && get_val(args_data[arg_index]) != get_val(value)) {
+              if (get_tag(value) == U32 && !(get_tag(args_data[arg_index]) == U32 && get_val(args_data[arg_index]) == get_val(value))) {
                 //printf("- no match num %llu\n", arg_index);
                 matched = 0;
                 break;

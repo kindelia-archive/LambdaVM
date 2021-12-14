@@ -734,7 +734,7 @@ export function reduce(mem: Mem, host: bigint) : Lnk {
     var term = ask_lnk(mem, host);
     //console.log("reduce " + get_tag(term)/TAG + ":" + get_ext(term)/EXT + ":" + get_val(term));
     //console.log("reduce " + D.debug_show_lnk(term));
-    //console.log("reduce", D.debug_show(mem,ask_lnk(mem,0n),{}));
+    //console.log("? reduce", D.debug_show(mem,ask_lnk(mem,0n),{}));
     //console.log((function() { var lnks = []; for (var i = 0; i < 26; ++i) { lnks.push(ask_lnk(mem, i)); } return lnks.map(debug_show_lnk).join("|"); })());
     switch (get_tag(term)) {
       case APP: {
@@ -832,11 +832,11 @@ export function reduce(mem: Mem, host: bigint) : Lnk {
             for (var j = 0; j < rule.test.length; ++j) {
               var value = rule.test[j];
               //console.log("-- testing argument " + j + " " + value.toString(16));
-              if (get_tag(value) === CT0 && get_ext(args[j]) !== get_ext(value)) {
+              if (get_tag(value) === CT0 && !(get_tag(args[j]) >= CT0 && get_tag(args[j]) <= CTG && get_ext(args[j]) === get_ext(value))) {
                 //console.log("-- fail (ctr doesn't match)", get_tag(args[j])/TAG);
                 continue try_rule;
               }
-              if (get_tag(value) === U32 && get_val(args[j]) !== get_val(value)) {
+              if (get_tag(value) === U32 && !(get_tag(args[j]) === U32 && get_val(args[j]) === get_val(value))) {
                 //console.log("-- fail (num doesn't match)");
                 continue try_rule;
               }

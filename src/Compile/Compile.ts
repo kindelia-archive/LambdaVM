@@ -105,11 +105,11 @@ export function compile_group(
           var term = rule.lhs.args[i];
           switch (term.$) {
             case "Ctr": {
-              conds.push("get_ext(LNK_"+i+") == "+(compile_constructor_name(term.name)||"?"));
+              conds.push("get_tag(LNK_"+i+") == CT"+term.args.length+" && get_ext(LNK_"+i+") == "+(compile_constructor_name(term.name)||"?"));
               break;
             }
             case "U32": {
-              conds.push("get_val(LNK_"+i+") == "+U64(target,term.numb));
+              conds.push("get_tag(LNK_"+i+") == U32 && get_val(LNK_"+i+") == "+U64(target,term.numb));
               break;
             }
           }
