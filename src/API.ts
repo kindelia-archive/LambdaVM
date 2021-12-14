@@ -9,8 +9,8 @@ import * as Readback from "./Compile/Readback.ts"
 
 type Mode = "DYNAMIC" | "COMPILED";
 
-const MODE : Mode = "DYNAMIC";
-//const MODE : Mode = "COMPILED";
+//const MODE : Mode = "DYNAMIC";
+const MODE : Mode = "COMPILED";
 
 function dylib_suffix() {
   switch (Deno.build.os) {
@@ -228,9 +228,7 @@ export async function run(code: string, opts: any) {
 
   if (normal !== null) {
     var ini = Date.now();
-    //console.log(Convert.runtime_to_lambolt(mem, Runtime.ask_lnk(mem,0), numb_table));
     var rwt = (normal as any)(mem, 0n);
-    //var rwt = 0;
     console.log(Readback.runtime_to_lambolt(mem, Runtime.ask_lnk(mem,0n), numb_table));
     console.log("");
     console.log("* rwt: " + rwt + " (" + (rwt/((Date.now()-ini)/1000)/1000000).toFixed(2) + "m rwt/s)");

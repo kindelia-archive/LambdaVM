@@ -318,7 +318,7 @@ export function clear(mem: Mem, loc: bigint, size: number) {
 
 // ~~~
 
-export function init(capacity: number = 2 ** 28) {
+export function init(capacity: number = 2 ** 29) {
   var mem = array_alloc(capacity);
   array_push(mem, 0n);
   return mem;
@@ -491,7 +491,7 @@ function op2_par_0(mem: Mem, host: bigint, term: Lnk, arg0: Lnk, arg1: Lnk): Lnk
 // (+ a &A<b0 b1>)
 // --------------- OP2-PAR-1
 // !A<a0 a1> = a
-// &A<(+ a0 a1) (+ b0 b1)>
+// &A<(+ a0 b0) (+ a1 b1)>
 function op2_par_1(mem: Mem, host: bigint, term: Lnk, arg0: Lnk, arg1: Lnk): Lnk {
   //console.log("[op2-par-1] " + get_loc(term,0) + " " + get_loc(arg0,0));
   ++GAS;
@@ -500,10 +500,10 @@ function op2_par_1(mem: Mem, host: bigint, term: Lnk, arg0: Lnk, arg1: Lnk): Lnk
   var let0 = alloc(mem, 3);
   var par0 = alloc(mem, 2);
   link(mem, let0+2n, arg0);
-  link(mem, op20+1n, Dp0(get_ext(arg1), let0));
-  link(mem, op20+0n, ask_arg(mem, arg1, 0));
-  link(mem, op21+0n, ask_arg(mem, arg1, 1));
-  link(mem, op21+1n, Dp1(get_ext(arg1), let0));
+  link(mem, op20+0n, Dp0(get_ext(arg1), let0));
+  link(mem, op20+1n, ask_arg(mem, arg1, 0));
+  link(mem, op21+1n, ask_arg(mem, arg1, 1));
+  link(mem, op21+0n, Dp1(get_ext(arg1), let0));
   link(mem, par0+0n, Op2(get_ext(term), op20));
   link(mem, par0+1n, Op2(get_ext(term), op21));
   var done = Par(get_ext(arg1), par0);
@@ -641,6 +641,38 @@ function let_ctr(mem: Mem, host: bigint, term: Lnk, arg0: Lnk): Lnk {
   }
 }
 
+// (F &A<a0 a1> b c ...)
+// --------------- CAL-PAR
+// !A<b0 b1> = b
+// !A<c0 c1> = c
+// ...
+// &A<(F a0 b0 c0 ...) (F a1 b1 c1 ...)>
+function cal_par(mem: Mem, host: bigint, term: Lnk, argn: Lnk, n: number): Lnk {
+  ++GAS;
+  let arit = get_ari(term);
+  let func = get_ext(term);
+  let fun0 = get_loc(term, 0);
+  let fun1 = alloc(mem, arit);
+  let par0 = get_loc(argn, 0);
+  for (var i = 0; i < arit; ++i) {
+    if (i !== n) {
+      let leti = alloc(mem, 3);
+      let argi = ask_arg(mem, term, i);
+      link(mem, fun0+BigInt(i), Dp0(get_ext(argn), leti));
+      link(mem, fun1+BigInt(i), Dp1(get_ext(argn), leti));
+      link(mem, leti+2n, argi);
+    } else {
+      link(mem, fun0+BigInt(i), ask_arg(mem, argn, 0));
+      link(mem, fun1+BigInt(i), ask_arg(mem, argn, 1));
+    }
+  }
+  link(mem, par0+0n, Cal(arit, func, fun0));
+  link(mem, par0+1n, Cal(arit, func, fun1));
+  let done = Par(get_ext(argn), par0);
+  link(mem, host, done);
+  return done;
+}
+
 function cal_ctrs(
   mem: Mem,
   host: bigint,
@@ -695,11 +727,14 @@ function cal_ctrs(
   return done;
 }
 
+import * as D from "./Debug.ts"
+
 export function reduce(mem: Mem, host: bigint) : Lnk {
   main: while (true) {
     var term = ask_lnk(mem, host);
     //console.log("reduce " + get_tag(term)/TAG + ":" + get_ext(term)/EXT + ":" + get_val(term));
-    //console.log("reduce", debug_show(mem,ask_lnk(mem,0),{}));
+    //console.log("reduce " + D.debug_show_lnk(term));
+    //console.log("reduce", D.debug_show(mem,ask_lnk(mem,0n),{}));
     //console.log((function() { var lnks = []; for (var i = 0; i < 26; ++i) { lnks.push(ask_lnk(mem, i)); } return lnks.map(debug_show_lnk).join("|"); })());
     switch (get_tag(term)) {
       case APP: {
@@ -754,8 +789,19 @@ export function reduce(mem: Mem, host: bigint) : Lnk {
       case FN0: case FN1: case FN2: case FN3: case FN4: case FN5: case FN6: case FN7:
       case FN8: case FN9: case FNA: case FNB: case FNC: case FND: case FNE: case FNF: case FNG: {
         var fun = get_ext(term);
+        var ari = get_ari(term);
         //console.log("\ncall", fun/EXT);
         
+        // Copying
+        // -------
+
+        for (var n = 0; n < ari; ++n) {
+          var argn = ask_arg(mem, term, n);
+          if (get_tag(argn) === PAR) {
+            return cal_par(mem, host, term, argn, n);
+          }
+        }
+
         // Static rules
         // ------------
         

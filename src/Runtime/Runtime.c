@@ -490,10 +490,10 @@ Lnk op2_par_1(u64 tid, Mem* mem, u64 host, Lnk term, Lnk arg0, Lnk arg1) {
   u64 let0 = alloc(mem, 3);
   u64 par0 = alloc(mem, 2);
   link(mem, let0+2, arg0);
-  link(mem, op20+1, Dp0(get_ext(arg1), let0));
-  link(mem, op20+0, ask_arg(mem, arg1, 0));
-  link(mem, op21+0, ask_arg(mem, arg1, 1));
-  link(mem, op21+1, Dp1(get_ext(arg1), let0));
+  link(mem, op20+0, Dp0(get_ext(arg1), let0));
+  link(mem, op20+1, ask_arg(mem, arg1, 0));
+  link(mem, op21+1, ask_arg(mem, arg1, 1));
+  link(mem, op21+0, Dp1(get_ext(arg1), let0));
   link(mem, par0+0, Op2(get_ext(term), op20));
   link(mem, par0+1, Op2(get_ext(term), op21));
   u64 done = Par(get_ext(arg1), par0);
@@ -591,6 +591,32 @@ Lnk let_ctr(u64 tid, Mem* mem, u64 host, Lnk term, Lnk arg0) {
     link(mem, host, done);
     return done;
   }
+}
+
+Lnk cal_par(u64 tid, Mem* mem, u64 host, Lnk term, Lnk argn, u64 n) {
+  inc_gas(tid);
+  u64 arit = get_ari(term);
+  u64 func = get_ext(term);
+  u64 fun0 = get_loc(term, 0);
+  u64 fun1 = alloc(mem, arit);
+  u64 par0 = get_loc(argn, 0);
+  for (u64 i = 0; i < arit; ++i) {
+    if (i != n) {
+      u64 leti = alloc(mem, 3);
+      u64 argi = ask_arg(mem, term, i);
+      link(mem, fun0+i, Dp0(get_ext(argn), leti));
+      link(mem, fun1+i, Dp1(get_ext(argn), leti));
+      link(mem, leti+2, argi);
+    } else {
+      link(mem, fun0+i, ask_arg(mem, argn, 0));
+      link(mem, fun1+i, ask_arg(mem, argn, 1));
+    }
+  }
+  link(mem, par0+0, Cal(arit, func, fun0));
+  link(mem, par0+1, Cal(arit, func, fun1));
+  u64 done = Par(get_ext(argn), par0);
+  link(mem, host, done);
+  return done;
 }
 
 Lnk cal_ctrs(
@@ -710,7 +736,16 @@ Lnk reduce(u64 tid, Mem* mem, u64 host) {
       case FN8: case FN9: case FNA: case FNB: case FNC: case FND: case FNE: case FNF: case FNG: {
         //printf("- cal\n");
         u64 fun = get_ext(term);
+        u64 ari = get_ari(term);
         //printf("- call fun %llu\n", fun);
+
+        for (u64 n = 0; n < ari; ++n) {
+          u64 argn = ask_arg(mem, term, n);
+          if (get_tag(argn) == PAR) {
+            return cal_par(tid, mem, host, term, argn, n);
+          }
+        }
+        
 
         // Static rules
         // ------------

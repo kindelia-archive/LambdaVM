@@ -5,8 +5,8 @@
   let z = λz λs z
   let f = (y λslow λn (n (λx x) λpred((slow pred) (slow pred))))
   (f 
-    (s (s (s (s (s
-    (s (s (s (s
+    //(s (s (s (s (s
+    //(s (s (s (s
     (s (s (s (s
     (s (s (s (s
     (s (s (s (s
@@ -14,7 +14,7 @@
     ))))
     ))))
     ))))
-    ))))
-    )))))
+    //))))
+    //)))))
   )
 
