@@ -1,8 +1,5 @@
 export type MAP<T> = Record<string, T>;
 
-
-
-
 // The LNK type is an union represented as a 64-bit BigInt.
 
 // NIL 00 00 00 00 00 00 00 00
@@ -138,6 +135,8 @@ export const NEQ : bigint = 0x15n * EXT
 //GENERATED_CONSTRUCTOR_IDS_START//
 //GENERATED_CONSTRUCTOR_IDS//
 //GENERATED_CONSTRUCTOR_IDS_END//
+
+var DYNAMIC : number = 0;
 
 export type Lnk = bigint // U52 in JS, U64 in C
 
@@ -734,7 +733,9 @@ export function reduce(mem: Mem, host: bigint) : Lnk {
     var term = ask_lnk(mem, host);
     //console.log("reduce " + get_tag(term)/TAG + ":" + get_ext(term)/EXT + ":" + get_val(term));
     //console.log("reduce " + D.debug_show_lnk(term));
-    //console.log("? reduce", D.debug_show(mem,ask_lnk(mem,0n),{}));
+    //console.log("reduce");
+    //console.log("- main: " + D.debug_show(mem,ask_lnk(mem,0n),{}));
+    //console.log("- term: " + D.debug_show(mem,ask_lnk(mem,host),{}));
     //console.log((function() { var lnks = []; for (var i = 0; i < 26; ++i) { lnks.push(ask_lnk(mem, i)); } return lnks.map(debug_show_lnk).join("|"); })());
     switch (get_tag(term)) {
       case APP: {
@@ -764,8 +765,7 @@ export function reduce(mem: Mem, host: bigint) : Lnk {
           }
         }
         if (get_tag(arg0) === U32) {
-          let_u32(mem, host, term, arg0);
-          continue;
+          return let_u32(mem, host, term, arg0);
         }
         if (get_tag(arg0) >= CT0 && get_tag(arg0) <= CTF) {
           return let_ctr(mem, host, term, arg0);
@@ -791,58 +791,55 @@ export function reduce(mem: Mem, host: bigint) : Lnk {
         var fun = get_ext(term);
         var ari = get_ari(term);
         //console.log("\ncall", fun/EXT);
-        
-        // Copying
-        // -------
-
-        for (var n = 0; n < ari; ++n) {
-          var argn = ask_arg(mem, term, n);
-          if (get_tag(argn) === PAR) {
-            return cal_par(mem, host, term, argn, n);
-          }
-        }
 
         // Static rules
         // ------------
         
-        switch (fun)
-        //GENERATED_REWRITE_RULES_START//
-        {
+        if (!DYNAMIC) {
+          switch (fun)
+          //GENERATED_REWRITE_RULES_START//
+          {
 //GENERATED_REWRITE_RULES//
+          }
+          //GENERATED_REWRITE_RULES_END//
         }
-        //GENERATED_REWRITE_RULES_END//
         
         // Dynamic rules
         // -------------
         
-        var page = BOOK[String(fun/EXT)];
-        if (page) {
-          //console.log("- got entry...");
-          var args = [];
-          for (var i = 0; i < page.match.length; ++i) {
-            if (page.match[i] > 0) {
-              args[i] = reduce(mem, get_loc(term, i));
-            } else {
-              args[i] = ask_lnk(mem, get_loc(term, i));
-            }
-          }
-          //console.log("- collected " + args.length + " args...");
-          try_rule: for (var rule of page.rules) {
-            //console.log("- testing rule with arity " + rule.test.length);
-            for (var j = 0; j < rule.test.length; ++j) {
-              var value = rule.test[j];
-              //console.log("-- testing argument " + j + " " + value.toString(16));
-              if (get_tag(value) === CT0 && !(get_tag(args[j]) >= CT0 && get_tag(args[j]) <= CTG && get_ext(args[j]) === get_ext(value))) {
-                //console.log("-- fail (ctr doesn't match)", get_tag(args[j])/TAG);
-                continue try_rule;
-              }
-              if (get_tag(value) === U32 && !(get_tag(args[j]) === U32 && get_val(args[j]) === get_val(value))) {
-                //console.log("-- fail (num doesn't match)");
-                continue try_rule;
+        if (DYNAMIC) {
+          var page = BOOK[String(fun/EXT)];
+          if (page) {
+            //console.log("- got entry...");
+            var args = [];
+            for (var i = 0; i < page.match.length; ++i) {
+              if (page.match[i] > 0) {
+                args[i] = reduce(mem, get_loc(term, i));
+                if (get_tag(args[i]) === PAR) {
+                  return cal_par(mem, host, term, args[i], i);
+                }
+              } else {
+                args[i] = ask_lnk(mem, get_loc(term, i));
               }
             }
-            cal_ctrs(mem, host, rule.clrs, rule.cols, rule.root, rule.body, term, args);
-            continue main;
+            //console.log("- collected " + args.length + " args...");
+            try_rule: for (var rule of page.rules) {
+              //console.log("- testing rule with arity " + rule.test.length);
+              for (var j = 0; j < rule.test.length; ++j) {
+                var value = rule.test[j];
+                //console.log("-- testing argument " + j + " " + value.toString(16));
+                if (get_tag(value) === CT0 && !(get_tag(args[j]) >= CT0 && get_tag(args[j]) <= CTG && get_ext(args[j]) === get_ext(value))) {
+                  //console.log("-- fail (ctr doesn't match)", get_tag(args[j])/TAG);
+                  continue try_rule;
+                }
+                if (get_tag(value) === U32 && !(get_tag(args[j]) === U32 && get_val(args[j]) === get_val(value))) {
+                  //console.log("-- fail (num doesn't match)");
+                  continue try_rule;
+                }
+              }
+              cal_ctrs(mem, host, rule.clrs, rule.cols, rule.root, rule.body, term, args);
+              continue main;
+            }
           }
         }
         break;
@@ -853,6 +850,9 @@ export function reduce(mem: Mem, host: bigint) : Lnk {
 }
 
 function normal_go(mem: Mem, host: bigint, seen: MAP<boolean>) : Lnk {
+  //console.log("normal");
+  //console.log("- main: " + D.debug_show(mem,ask_lnk(mem,0n),{}));
+  //console.log("- term: " + D.debug_show(mem,ask_lnk(mem,host),{}));
   var term = ask_lnk(mem, host);
   if (seen[String(host)]) {
     return term;
@@ -900,6 +900,7 @@ function normal_go(mem: Mem, host: bigint, seen: MAP<boolean>) : Lnk {
 }
 
 export function normal(mem: Mem, host: bigint) : number {
+  //GENERATED_DYNAMIC_FLAG//
   GAS = 0;
   normal_go(mem, host, {});
   return GAS;

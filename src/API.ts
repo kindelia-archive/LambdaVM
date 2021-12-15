@@ -7,10 +7,10 @@ import * as Compile from "./Compile/Compile.ts"
 import * as Dynbook from "./Compile/Dynbook.ts"
 import * as Readback from "./Compile/Readback.ts"
 
-type Mode = "DYNAMIC" | "COMPILED";
+type Mode = "DYNAMIC" | "STATIC";
 
 //const MODE : Mode = "DYNAMIC";
-const MODE : Mode = "COMPILED";
+const MODE : Mode = "STATIC";
 
 function dylib_suffix() {
   switch (Deno.build.os) {
@@ -24,11 +24,7 @@ async function build_runtime(file: Lambolt.File, target: string, mode: Mode) {
   var source_path = new URL("./Runtime/Runtime."+target, import.meta.url);
   var target_path = new URL("./../bin/Runtime."+target, import.meta.url);
   var source_code = await Deno.readTextFile(source_path);
-  if (mode === "DYNAMIC") {
-    var target_code = source_code; // use dynamic book
-  } else {
-    var target_code = Compile.compile(file, target, source_code); // compile book directly
-  }
+  var target_code = Compile.compile(file, target, mode, source_code);
   await Deno.writeTextFileSync(target_path, target_code);
 }
 
@@ -206,14 +202,18 @@ export async function run(code: string, opts: any) {
   if (opts.target === "c") {
     await build_runtime(file, "c", MODE);
     await c_compile();
-    c_add_dynbook(book);
+    if (MODE === "DYNAMIC") {
+      c_add_dynbook(book);
+    }
     normal = c_normal;
   }
 
   if (opts.target === "ts") {
     await build_runtime(file, "ts", MODE);
     var js = await import((new URL("./../bin/Runtime.ts", import.meta.url)).pathname);
-    js.add_dynbook(book);
+    if (MODE === "DYNAMIC") {
+      js.add_dynbook(book);
+    }
     normal = js.normal;
   }
 

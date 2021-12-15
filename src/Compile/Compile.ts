@@ -7,7 +7,7 @@ export * from "./Common.ts"
 // --------
 
 // Compiles a Lambolt file to a target language.
-export function compile(file: L.File, target: string, template: string) {
+export function compile(file: L.File, target: string, mode: "DYNAMIC" | "STATIC", template: string) {
   //console.log("Compiling file...");
 
   // Generates the name table.
@@ -18,6 +18,9 @@ export function compile(file: L.File, target: string, template: string) {
 
   // Groups the rules by name.
   var groups = gen_groups(file);
+
+  // Compiles dynamic flag.
+  var dynamic_flag = "DYNAMIC = " + (mode === "DYNAMIC" ? 1 : 0) + ";\n";
 
   // Compiles constructor ids.
   var constructor_ids = "";
@@ -35,6 +38,7 @@ export function compile(file: L.File, target: string, template: string) {
   //console.log(rewrite_rules);
 
   return template
+    .replace("//GENERATED_DYNAMIC_FLAG//", dynamic_flag)
     .replace("//GENERATED_REWRITE_RULES//", rewrite_rules)
     .replace("//GENERATED_CONSTRUCTOR_IDS//", constructor_ids);
 }
@@ -84,7 +88,8 @@ export function compile_group(
     }
     for (var i = 0; i < arity; ++i) {
       if (reduce_at[i]) {
-        text += line(tab+1, VAR(target)+" LNK_"+i+" = "+REDUCE(target, ["mem", "LOC_"+i])+";");
+        text += line(tab+1, VAR(target)+" LNK_"+i+" = reduce("+TID(target)+"mem, LOC_"+i+");");
+        text += line(tab+1, "if (get_tag(LNK_"+i+") == PAR) return cal_par("+TID(target)+"mem, host, term, LNK_"+i+", "+i+");");
       } else {
         text += line(tab+1, VAR(target)+" LNK_"+i+" = ask_arg(mem, term, "+i+");");
       }
@@ -328,9 +333,9 @@ function GAS(target: string) {
   }
 }
 
-function REDUCE(target: string, args: Array<string>) {
+function TID(target: string) {
   switch (target) {
-    case "ts": return "reduce(" + args.join(",") + ")";
-    case "c": return "reduce(tid, " + args.join(",") + ")";
+    case "ts": return "";
+    case "c": return "tid, ";
   }
 }
