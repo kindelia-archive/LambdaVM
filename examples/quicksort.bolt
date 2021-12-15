@@ -22,4 +22,5 @@
   (Slow.go 0 r) = r
   (Slow.go n r) = (Slow.go (- n 1) (+ r (Sum (Quicksort (Generate n 2500)))))
 
-(Main) = (Slow 1)
+//(Main) = (Slow 50)
+(Main) = (Sum (Quicksort (Generate 0 200)))

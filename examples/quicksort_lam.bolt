@@ -1,0 +1,41 @@
+(If 0) = λt λf f
+(If 1) = λt λf t
+
+(Main) =
+  let y = λf ((λr (f (r r))) (λr (f (r r))))
+
+  let nil = λnil λcons nil
+  let cons = λh λt λnil λcons (cons h t)
+
+  let filter = (y λfilter λfn λlist
+    let case_nil = nil
+    let case_cons = λx λxs
+      let case_true = λfn λxs λfilter (cons x (filter fn xs))
+      let case_false = λfn λxs λfilter (filter fn xs)
+      (fn x case_true case_false fn xs filter)
+    (list case_nil case_cons))
+
+  let concat = (y λconcat λa λb
+    let case_nil = λb b
+    let case_cons = λah λat λb (cons ah (concat at b))
+    (a case_nil case_cons b))
+
+  let quicksort = (y λquicksort λlist
+    let case_nil = nil
+    let case_cons = λh λt
+      let min = (filter λx(If (< x h)) list)
+      let max = (filter λx(If (> x h)) list)
+      (concat (quicksort min) (cons h (quicksort max)))
+    (list case_nil case_cons))
+
+  let generate = (y λgenerate λseed λn
+    ((If (== n 0))
+      nil
+      (cons seed (generate (+ (* seed 1664525) 1013904223) (- n 1)))))
+
+  let sum = (y λsum λlist
+    let case_nil = 0
+    let case_cons = λx λxs (+ x (sum xs))
+    (list case_nil case_cons))
+
+  (sum (quicksort (generate 0 200)))
