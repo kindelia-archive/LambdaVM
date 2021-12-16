@@ -345,6 +345,7 @@ Lnk reduce(Mem* MEM, u64 host) {
         // --------- OP2-U32
         // add(a, b)
         if (get_tag(val0) == U32 && get_tag(val1) == U32) {
+          inc_gas(MEM);
           u32 a = get_num(val0);
           u32 b = get_num(val1);
           u32 c;
@@ -375,6 +376,7 @@ Lnk reduce(Mem* MEM, u64 host) {
         // !A<b0 b1> = b
         // &A<(+ a0 b0) (+ a1 b1)>
         if (get_tag(val0) == PAR) {
+          inc_gas(MEM);
           u64 op20 = get_loc(term, 0);
           u64 op21 = get_loc(val0, 0);
           u64 let0 = alloc(MEM, 3);
@@ -393,6 +395,7 @@ Lnk reduce(Mem* MEM, u64 host) {
         // !A<a0 a1> = a
         // &A<(+ a0 a1) (+ b0 b1)>
         if (get_tag(val1) == PAR) {
+          inc_gas(MEM);
           u64 op20 = get_loc(term, 0);
           u64 op21 = get_loc(val1, 0);
           u64 let0 = alloc(MEM, 3);
@@ -520,6 +523,7 @@ Lnk reduce(Mem* MEM, u64 host) {
           // y <- #k
           // ~
           case U32: {
+            inc_gas(MEM);
             subst(MEM, get_lnk(MEM,term,0), expr);
             subst(MEM, get_lnk(MEM,term,1), expr);
             link(MEM, host, expr);
