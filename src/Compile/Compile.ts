@@ -99,7 +99,7 @@ export function compile_group(
     for (var {rule,uses} of rules) {
       if (rule.lhs.$ === "Ctr" && rule.lhs.args.length === arity) {
 
-        var clears = ["clear(mem, get_loc(term, "+i+"), "+rule.lhs.args.length+")"];
+        var clears = ["clear(mem, get_loc(term, 0), "+rule.lhs.args.length+")"];
         var collects = [];
 
         // Checks if this rule matches and enters its branch. That is,
