@@ -45,10 +45,7 @@ export function runtime_to_lambolt(MEM: C.Mem, input_term: C.Lnk | null = null, 
         case C.U32: {
           break;
         }
-        case C.CT0: case C.CT1: case C.CT2: case C.CT3: case C.CT4: case C.CT5: case C.CT6: case C.CT7:
-        case C.CT8: case C.CT9: case C.CTA: case C.CTB: case C.CTC: case C.CTD: case C.CTE: case C.CTF: case C.CTG:
-        case C.FN0: case C.FN1: case C.FN2: case C.FN3: case C.FN4: case C.FN5: case C.FN6: case C.FN7:
-        case C.FN8: case C.FN9: case C.FNA: case C.FNB: case C.FNC: case C.FND: case C.FNE: case C.FNF: case C.FNG: {
+        case C.CTR: case C.FUN: {
           var arity = C.get_ari(term);
           for (var i = 0; i < arity; ++i) {
             name(C.ask_arg(MEM, term, i), depth + 1);
@@ -132,10 +129,7 @@ export function runtime_to_lambolt(MEM: C.Mem, input_term: C.Lnk | null = null, 
         case C.U32: {
           return "" + C.get_val(term);
         }
-        case C.CT0: case C.CT1: case C.CT2: case C.CT3: case C.CT4: case C.CT5: case C.CT6: case C.CT7:
-        case C.CT8: case C.CT9: case C.CTA: case C.CTB: case C.CTC: case C.CTD: case C.CTE: case C.CTF: case C.CTG: 
-        case C.FN0: case C.FN1: case C.FN2: case C.FN3: case C.FN4: case C.FN5: case C.FN6: case C.FN7:
-        case C.FN8: case C.FN9: case C.FNA: case C.FNB: case C.FNC: case C.FND: case C.FNE: case C.FNF: case C.FNG: {
+        case C.CTR: {
           let func = C.get_ext(term);
           var arit = C.get_ari(term);
           let args = [];

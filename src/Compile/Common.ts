@@ -1,5 +1,4 @@
 import * as L from "https://raw.githubusercontent.com/Kindelia/Lambolt/master/src/Lambolt.ts"
-import {EXT} from "./../Runtime/Runtime.ts"
 
 // Generates a name table for a whole program. That table links constructor
 // names (such as `cons` and `succ`) to small ids (such as `0` and `1`).
@@ -33,9 +32,9 @@ export function gen_name_table(file: L.File) : {[name: string]: bigint} {
       case "Ctr": {
         if (table[term.name] === undefined) {
           if (term.name[0] === "." && !isNaN(Number(term.name.slice(1)))) {
-            table[term.name] = BigInt(term.name.slice(1)) * EXT;
+            table[term.name] = BigInt(term.name.slice(1));
           } else {
-            table[term.name] = BigInt(fresh++) * EXT;
+            table[term.name] = BigInt(fresh++);
           }
         }
         for (var arg of term.args) {

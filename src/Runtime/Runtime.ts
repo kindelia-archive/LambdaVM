@@ -65,72 +65,41 @@ export type MAP<T> = Record<string, T>;
 
 export const VAL : bigint = 2n ** 0n;
 export const EXT : bigint = 2n ** 32n;
-export const TAG : bigint = 2n ** 56n;
+export const ARI : bigint = 2n ** 56n;
+export const TAG : bigint = 2n ** 60n;
 
-export const NIL : bigint = 0x00n * TAG
-export const DP0 : bigint = 0x02n * TAG
-export const DP1 : bigint = 0x03n * TAG
-export const VAR : bigint = 0x04n * TAG
-export const ARG : bigint = 0x05n * TAG
-export const ERA : bigint = 0x06n * TAG
-export const LAM : bigint = 0x07n * TAG
-export const APP : bigint = 0x08n * TAG
-export const PAR : bigint = 0x09n * TAG
-export const CT0 : bigint = 0x20n * TAG
-export const CT1 : bigint = 0x21n * TAG
-export const CT2 : bigint = 0x22n * TAG
-export const CT3 : bigint = 0x23n * TAG
-export const CT4 : bigint = 0x24n * TAG
-export const CT5 : bigint = 0x25n * TAG
-export const CT6 : bigint = 0x26n * TAG
-export const CT7 : bigint = 0x27n * TAG
-export const CT8 : bigint = 0x28n * TAG
-export const CT9 : bigint = 0x29n * TAG
-export const CTA : bigint = 0x2An * TAG
-export const CTB : bigint = 0x2Bn * TAG
-export const CTC : bigint = 0x2Cn * TAG
-export const CTD : bigint = 0x2Dn * TAG
-export const CTE : bigint = 0x2En * TAG
-export const CTF : bigint = 0x2Fn * TAG
-export const CTG : bigint = 0x30n * TAG
-export const FN0 : bigint = 0x40n * TAG
-export const FN1 : bigint = 0x41n * TAG
-export const FN2 : bigint = 0x42n * TAG
-export const FN3 : bigint = 0x43n * TAG
-export const FN4 : bigint = 0x44n * TAG
-export const FN5 : bigint = 0x45n * TAG
-export const FN6 : bigint = 0x46n * TAG
-export const FN7 : bigint = 0x47n * TAG
-export const FN8 : bigint = 0x48n * TAG
-export const FN9 : bigint = 0x49n * TAG
-export const FNA : bigint = 0x4An * TAG
-export const FNB : bigint = 0x4Bn * TAG
-export const FNC : bigint = 0x4Cn * TAG
-export const FND : bigint = 0x4Dn * TAG
-export const FNE : bigint = 0x4En * TAG
-export const FNF : bigint = 0x4Fn * TAG
-export const FNG : bigint = 0x50n * TAG
-export const OP2 : bigint = 0x60n * TAG
-export const U32 : bigint = 0xF0n * TAG
-export const F32 : bigint = 0xF1n * TAG
-export const OUT : bigint = 0xFFn * TAG
+export const DP0 : bigint = 0x0n;
+export const DP1 : bigint = 0x1n;
+export const VAR : bigint = 0x2n;
+export const ARG : bigint = 0x3n;
+export const ERA : bigint = 0x4n;
+export const LAM : bigint = 0x5n;
+export const APP : bigint = 0x6n;
+export const PAR : bigint = 0x7n;
+export const CTR : bigint = 0x8n;
+export const FUN : bigint = 0x9n;
+export const OP2 : bigint = 0xAn;
+export const U32 : bigint = 0xBn;
+export const F32 : bigint = 0xCn;
+export const OUT : bigint = 0xEn;
+export const NIL : bigint = 0xFn;
 
-export const ADD : bigint = 0x00n * EXT
-export const SUB : bigint = 0x01n * EXT
-export const MUL : bigint = 0x02n * EXT
-export const DIV : bigint = 0x03n * EXT
-export const MOD : bigint = 0x04n * EXT
-export const AND : bigint = 0x05n * EXT
-export const OR  : bigint = 0x06n * EXT
-export const XOR : bigint = 0x07n * EXT
-export const SHL : bigint = 0x08n * EXT
-export const SHR : bigint = 0x09n * EXT
-export const LTN : bigint = 0x10n * EXT
-export const LTE : bigint = 0x11n * EXT
-export const EQL : bigint = 0x12n * EXT
-export const GTE : bigint = 0x13n * EXT
-export const GTN : bigint = 0x14n * EXT
-export const NEQ : bigint = 0x15n * EXT
+export const ADD : bigint = 0x0n;
+export const SUB : bigint = 0x1n;
+export const MUL : bigint = 0x2n;
+export const DIV : bigint = 0x3n;
+export const MOD : bigint = 0x4n;
+export const AND : bigint = 0x5n;
+export const OR  : bigint = 0x6n;
+export const XOR : bigint = 0x7n;
+export const SHL : bigint = 0x8n;
+export const SHR : bigint = 0x9n;
+export const LTN : bigint = 0xAn;
+export const LTE : bigint = 0xBn;
+export const EQL : bigint = 0xCn;
+export const GTE : bigint = 0xDn;
+export const GTN : bigint = 0xEn;
+export const NEQ : bigint = 0xFn;
 
 //GENERATED_CONSTRUCTOR_IDS_START//
 //GENERATED_CONSTRUCTOR_IDS//
@@ -200,81 +169,75 @@ export function array_pop(arr: Arr) : bigint | null {
 export var GAS : number = 0;
 
 export function Var(pos: bigint) : Lnk {
-  return VAR | pos;
+  return (VAR * TAG) | pos;
 }
 
 export function Dp0(col: bigint, pos: bigint) : Lnk {
-  return DP0 | col | pos;
+  return (DP0 * TAG) | (col * EXT) | pos;
 }
 
 export function Dp1(col: bigint, pos: bigint) : Lnk {
-  return DP1 | col | pos;
+  return (DP1 * TAG) | (col * EXT) | pos;
 }
 
 export function Arg(pos: bigint) : Lnk {
-  return ARG | pos;
+  return (ARG * TAG) | pos;
 }
 
 export function Era() : Lnk {
-  return ERA;
+  return (ERA * TAG);
 }
 
 export function Lam(pos: bigint) : Lnk {
-  return LAM | pos;
+  return (LAM * TAG) | pos;
 }
 
 export function App(pos: bigint) : Lnk {
-  return APP | pos;
+  return (APP * TAG) | pos;
 }
 
 export function Par(col: bigint, pos: bigint) : Lnk {
-  return PAR | col | pos;
+  return (PAR * TAG) | (col * EXT) | pos;
 }
 
 export function Op2(ope: bigint, pos: bigint) : Lnk {
-  return OP2 | ope | pos;
+  return (OP2 * TAG) | (ope * EXT) | pos;
 }
 
 export function U_32(val: bigint) : Lnk {
-  return U32 | val;
+  return (U32 * TAG) | val;
 }
 
 export function Nil() : Lnk {
-  return NIL;
+  return (NIL * TAG);
 }
 
 export function Ctr(ari: number, fun: bigint, pos: bigint) : Lnk {
-  return (CT0 + BigInt(ari) * TAG) | fun | pos;
+  return (CTR * TAG) + (BigInt(ari) * ARI) | (fun * EXT) | pos;
 }
 
 export function Cal(ari: number, fun: bigint, pos: bigint) : Lnk {
-  return (FN0 + BigInt(ari) * TAG) | fun | pos;
+  return (FUN * TAG) + (BigInt(ari) * ARI) | (fun * EXT) | pos;
 }
 
 export function Out(arg: bigint, fld: bigint) : Lnk {
-  return OUT + (arg << 8n) + fld;
+  return (OUT * TAG) + (arg << 8n) + fld;
 }
 
 export function get_tag(lnk: Lnk) : bigint {
-  return lnk & 0xFF00000000000000n;
-}
-
-export function get_ext(lnk: Lnk) : bigint {
-  return lnk & 0x00FFFFFF00000000n;
-}
-
-export function get_val(lnk: Lnk) : bigint {
-  return lnk & 0x00000000FFFFFFFFn;
+  return (lnk / TAG);
 }
 
 export function get_ari(lnk: Lnk) : number {
-  if (lnk >= CT0 && lnk <= CTG) {
-    return Number((get_tag(lnk) - CT0) / TAG);
-  }
-  if (lnk >= FN0 && lnk <= FNG) {
-    return Number((get_tag(lnk) - FN0) / TAG);
-  }
-  return 0;
+  return Number((lnk / ARI) & 0xFn);
+}
+
+export function get_ext(lnk: Lnk) : bigint {
+  return (lnk / EXT) & 0xFFFFFFn;
+}
+
+export function get_val(lnk: Lnk) : bigint {
+  return lnk & 0xFFFFFFFFn;
 }
 
 export function get_loc(lnk: Lnk, arg: number) : bigint {
@@ -370,10 +333,7 @@ export function collect(mem: Mem, term: Lnk) {
     case U32: {
       break;
     }
-    case CT0: case CT1: case CT2: case CT3: case CT4: case CT5: case CT6: case CT7:
-    case CT8: case CT9: case CTA: case CTB: case CTC: case CTD: case CTE: case CTF: case CTG:
-    case FN0: case FN1: case FN2: case FN3: case FN4: case FN5: case FN6: case FN7:
-    case FN8: case FN9: case FNA: case FNB: case FNC: case FND: case FNE: case FNF: case FNG: {
+    case CTR: case FUN: {
       var arity = get_ari(term);
       for (var i = 0; i < arity; ++i) {
         collect(mem, ask_arg(mem,term,i));
@@ -767,7 +727,7 @@ export function reduce(mem: Mem, host: bigint) : Lnk {
         if (get_tag(arg0) === U32) {
           return let_u32(mem, host, term, arg0);
         }
-        if (get_tag(arg0) >= CT0 && get_tag(arg0) <= CTF) {
+        if (get_tag(arg0) === CTR) {
           return let_ctr(mem, host, term, arg0);
         }
         break;
@@ -786,8 +746,7 @@ export function reduce(mem: Mem, host: bigint) : Lnk {
         }
         break;
       }
-      case FN0: case FN1: case FN2: case FN3: case FN4: case FN5: case FN6: case FN7:
-      case FN8: case FN9: case FNA: case FNB: case FNC: case FND: case FNE: case FNF: case FNG: {
+      case FUN: {
         var fun = get_ext(term);
         var ari = get_ari(term);
         //console.log("\ncall", fun/EXT);
@@ -828,7 +787,7 @@ export function reduce(mem: Mem, host: bigint) : Lnk {
               for (var j = 0; j < rule.test.length; ++j) {
                 var value = rule.test[j];
                 //console.log("-- testing argument " + j + " " + value.toString(16));
-                if (get_tag(value) === CT0 && !(get_tag(args[j]) >= CT0 && get_tag(args[j]) <= CTG && get_ext(args[j]) === get_ext(value))) {
+                if (get_tag(value) === CTR && !(get_tag(args[j]) === CTR && get_ext(args[j]) === get_ext(value))) {
                   //console.log("-- fail (ctr doesn't match)", get_tag(args[j])/TAG);
                   continue try_rule;
                 }
@@ -882,10 +841,7 @@ function normal_go(mem: Mem, host: bigint, seen: MAP<boolean>) : Lnk {
         link(mem, get_loc(term,2), normal_go(mem, get_loc(term,2), seen));
         return term;
       }
-      case CT0: case CT1: case CT2: case CT3: case CT4: case CT5: case CT6: case CT7:
-      case CT8: case CT9: case CTA: case CTB: case CTC: case CTD: case CTE: case CTF: case CTG:
-      case FN0: case FN1: case FN2: case FN3: case FN4: case FN5: case FN6: case FN7:
-      case FN8: case FN9: case FNA: case FNB: case FNC: case FND: case FNE: case FNF: case FNG: {
+      case CTR: case FUN: {
         var arity = get_ari(term);
         for (var i = 0; i < arity; ++i) {
           link(mem, get_loc(term,i), normal_go(mem, get_loc(term,i), seen));
@@ -905,3 +861,16 @@ export function normal(mem: Mem, host: bigint) : number {
   normal_go(mem, host, {});
   return GAS;
 }
+
+// Uncomment to test without Deno FFI
+//int main() {
+  //Mem mem;
+  //mem.size = 1;
+  //mem.data = (u64*)malloc(2 * 134217728 * sizeof(u64)); // 2gb
+  //mem.data[0] = Cal(0, $MAIN, 0);
+  //printf("Reducing...\n");
+  //normal_ffi((u8*)mem.data, mem.size, 0);
+  //printf("Done!\n");
+  //free(&mem.data);
+  //printf("rwt: %d\n", get_gas());
+//}

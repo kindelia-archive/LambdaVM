@@ -22,7 +22,7 @@ export function compile(file: L.File) {
   var book : R.Book = {};
   for (var group_name in groups) {
     //console.log("- compiling", group_name, name_table[group_name] / R.EXT);
-    book[String(name_table[group_name] / R.EXT)] = compile_group(group_name, groups[group_name][0], groups[group_name][1], name_table, is_call);
+    book[String(name_table[group_name])] = compile_group(group_name, groups[group_name][0], groups[group_name][1], name_table, is_call);
   }
 
   return book;
@@ -91,7 +91,7 @@ export function compile_group(
           var term = rule.lhs.args[i];
           switch (term.$) {
             case "Ctr": {
-              page.rules[r].test.push(R.CT0 + name_table[term.name]);
+              page.rules[r].test.push(R.CTR + name_table[term.name]);
               break;
             }
             case "U32": {
@@ -197,7 +197,7 @@ export function compile_group(
       case "Dup": {
         var aloc = BigInt(data.length);
         data.length += 3;
-        var dupk = (dups++) * R.EXT;
+        var dupk = (dups++);
         vars[term.nam0] = R.Dp0(dupk, aloc + 0n);
         vars[term.nam1] = R.Dp1(dupk, aloc + 0n);
         if (!uses[term.nam0]) {

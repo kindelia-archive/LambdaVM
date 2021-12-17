@@ -23,4 +23,4 @@
   (Slow.go n r) = (Slow.go (- n 1) (+ r (Sum (Quicksort (Generate n 2500)))))
 
 //(Main) = (Slow 50)
-(Main) = (Sum (Quicksort (Generate 0 200)))
+(Main) = (Slow 100)

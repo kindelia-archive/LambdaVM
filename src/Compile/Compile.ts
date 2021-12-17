@@ -110,7 +110,7 @@ export function compile_group(
           var term = rule.lhs.args[i];
           switch (term.$) {
             case "Ctr": {
-              conds.push("get_tag(LNK_"+i+") == CT"+term.args.length+" && get_ext(LNK_"+i+") == "+(compile_constructor_name(term.name)||"?"));
+              conds.push("get_tag(LNK_"+i+") == CTR && get_ext(LNK_"+i+") == "+(compile_constructor_name(term.name)||"?"));
               break;
             }
             case "U32": {
@@ -209,7 +209,7 @@ export function compile_group(
         var dupn = fresh("col");
         var dupk = dups++;
         text += line(tab, VAR(target) + " " + name + " = alloc(mem, 3);");
-        text += line(tab, VAR(target) + " " + dupn + " = " + U64(target,dupk) + " * EXT;");
+        text += line(tab, VAR(target) + " " + dupn + " = " + U64(target,dupk) + ";");
         args[term.nam0] = "Dp0("+dupn+", "+name+")";
         args[term.nam1] = "Dp1("+dupn+", "+name+")";
         if (!uses[term.nam0]) {

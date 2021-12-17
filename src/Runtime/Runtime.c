@@ -12,72 +12,41 @@ typedef unsigned long long int u64;
 
 const u64 VAL = 1;
 const u64 EXT = 0x100000000; 
-const u64 TAG = 0x100000000000000;
+const u64 ARI = 0x100000000000000;
+const u64 TAG = 0x1000000000000000;
 
-const u64 NIL = 0x00 * TAG;
-const u64 DP0 = 0x02 * TAG;
-const u64 DP1 = 0x03 * TAG;
-const u64 VAR = 0x04 * TAG;
-const u64 ARG = 0x05 * TAG;
-const u64 ERA = 0x06 * TAG;
-const u64 LAM = 0x07 * TAG;
-const u64 APP = 0x08 * TAG;
-const u64 PAR = 0x09 * TAG;
-const u64 CT0 = 0x20 * TAG;
-const u64 CT1 = 0x21 * TAG;
-const u64 CT2 = 0x22 * TAG;
-const u64 CT3 = 0x23 * TAG;
-const u64 CT4 = 0x24 * TAG;
-const u64 CT5 = 0x25 * TAG;
-const u64 CT6 = 0x26 * TAG;
-const u64 CT7 = 0x27 * TAG;
-const u64 CT8 = 0x28 * TAG;
-const u64 CT9 = 0x29 * TAG;
-const u64 CTA = 0x2A * TAG;
-const u64 CTB = 0x2B * TAG;
-const u64 CTC = 0x2C * TAG;
-const u64 CTD = 0x2D * TAG;
-const u64 CTE = 0x2E * TAG;
-const u64 CTF = 0x2F * TAG;
-const u64 CTG = 0x30 * TAG;
-const u64 FN0 = 0x40 * TAG;
-const u64 FN1 = 0x41 * TAG;
-const u64 FN2 = 0x42 * TAG;
-const u64 FN3 = 0x43 * TAG;
-const u64 FN4 = 0x44 * TAG;
-const u64 FN5 = 0x45 * TAG;
-const u64 FN6 = 0x46 * TAG;
-const u64 FN7 = 0x47 * TAG;
-const u64 FN8 = 0x48 * TAG;
-const u64 FN9 = 0x49 * TAG;
-const u64 FNA = 0x4A * TAG;
-const u64 FNB = 0x4B * TAG;
-const u64 FNC = 0x4C * TAG;
-const u64 FND = 0x4D * TAG;
-const u64 FNE = 0x4E * TAG;
-const u64 FNF = 0x4F * TAG;
-const u64 FNG = 0x50 * TAG;
-const u64 OP2 = 0x60 * TAG;
-const u64 U32 = 0xF0 * TAG;
-const u64 F32 = 0xF1 * TAG;
-const u64 OUT = 0xFF * TAG;
+const u64 DP0 = 0x0;
+const u64 DP1 = 0x1;
+const u64 VAR = 0x2;
+const u64 ARG = 0x3;
+const u64 ERA = 0x4;
+const u64 LAM = 0x5;
+const u64 APP = 0x6;
+const u64 PAR = 0x7;
+const u64 CTR = 0x8;
+const u64 FUN = 0x9;
+const u64 OP2 = 0xA;
+const u64 U32 = 0xB;
+const u64 F32 = 0xC;
+const u64 OUT = 0xE;
+const u64 NIL = 0xF;
 
-const u64 ADD = 0x00 * EXT;
-const u64 SUB = 0x01 * EXT;
-const u64 MUL = 0x02 * EXT;
-const u64 DIV = 0x03 * EXT;
-const u64 MOD = 0x04 * EXT;
-const u64 AND = 0x05 * EXT;
-const u64 OR  = 0x06 * EXT;
-const u64 XOR = 0x07 * EXT;
-const u64 SHL = 0x08 * EXT;
-const u64 SHR = 0x09 * EXT;
-const u64 LTN = 0x10 * EXT;
-const u64 LTE = 0x11 * EXT;
-const u64 EQL = 0x12 * EXT;
-const u64 GTE = 0x13 * EXT;
-const u64 GTN = 0x14 * EXT;
-const u64 NEQ = 0x15 * EXT;
+const u64 ADD = 0x0;
+const u64 SUB = 0x1;
+const u64 MUL = 0x2;
+const u64 DIV = 0x3;
+const u64 MOD = 0x4;
+const u64 AND = 0x5;
+const u64 OR  = 0x6;
+const u64 XOR = 0x7;
+const u64 SHL = 0x8;
+const u64 SHR = 0x9;
+const u64 LTN = 0xA;
+const u64 LTE = 0xB;
+const u64 EQL = 0xC;
+const u64 GTE = 0xD;
+const u64 GTN = 0xE;
+const u64 NEQ = 0xF;
 
 //GENERATED_CONSTRUCTOR_IDS_START//
 //GENERATED_CONSTRUCTOR_IDS//
@@ -167,81 +136,75 @@ void inc_gas(u64 tid) {
 }
 
 Lnk Var(u64 pos) {
-  return VAR | pos;
+  return (VAR * TAG) | pos;
 }
 
 Lnk Dp0(u64 col, u64 pos) {
-  return DP0 | col | pos;
+  return (DP0 * TAG) | (col * EXT) | pos;
 }
 
 Lnk Dp1(u64 col, u64 pos) {
-  return DP1 | col | pos;
+  return (DP1 * TAG) | (col * EXT) | pos;
 }
 
 Lnk Arg(u64 pos) {
-  return ARG | pos;
+  return (ARG * TAG) | pos;
 }
 
 Lnk Era() {
-  return ERA;
+  return (ERA * TAG);
 }
 
 Lnk Lam(u64 pos) {
-  return LAM | pos;
+  return (LAM * TAG) | pos;
 }
 
 Lnk App(u64 pos) {
-  return APP | pos;
+  return (APP * TAG) | pos;
 }
 
 Lnk Par(u64 col, u64 pos) {
-  return PAR | col | pos;
+  return (PAR * TAG) | (col * EXT) | pos;
 }
 
 Lnk Op2(u64 ope, u64 pos) {
-  return OP2 | ope | pos;
+  return (OP2 * TAG) | (ope * EXT) | pos;
 }
 
 Lnk U_32(u64 val) {
-  return U32 | val;
+  return (U32 * TAG) | val;
 }
 
 Lnk Nil() {
-  return NIL;
+  return NIL * TAG;
 }
 
 Lnk Ctr(u64 ari, u64 fun, u64 pos) {
-  return (CT0 + ari * TAG) | fun | pos;
+  return (CTR * TAG) | (ari * ARI) | (fun * EXT) | pos;
 }
 
 Lnk Cal(u64 ari, u64 fun, u64 pos) { 
-  return (FN0 + ari * TAG) | fun | pos;
+  return (FUN * TAG) | (ari * ARI) | (fun * EXT) | pos;
 }
 
 Lnk Out(u64 arg, u64 fld) {
-  return OUT | (arg << 8) | fld;
+  return (OUT * TAG) | (arg << 8) | fld;
 }
 
 u64 get_tag(Lnk lnk) {
-  return lnk & 0xFF00000000000000;
+  return lnk / TAG;
 }
 
 u64 get_ext(Lnk lnk) {
-  return lnk & 0x00FFFFFF00000000;
+  return (lnk / EXT) & 0xFFFFFF;
 }
 
 u64 get_val(Lnk lnk) {
-  return lnk & 0x00000000FFFFFFFF;
+  return lnk & 0xFFFFFFFF;
 }
 
 u64 get_ari(Lnk lnk) {
-  if (lnk >= CT0 && lnk <= CTG) {
-    return (get_tag(lnk) - CT0) / TAG;
-  }
-  if (lnk >= FN0 && lnk <= FNG) {
-    return (get_tag(lnk) - FN0) / TAG;
-  }
-  return 0;
+  return (lnk / ARI) & 0xF;
 }
 
 u64 get_loc(Lnk lnk, u64 arg) {
@@ -263,6 +226,31 @@ u64 link(Mem* mem, u64 loc, Lnk lnk) {
   }
   return lnk;
 }
+
+//u64 reuse(Mem* mem, u64 size) {
+  //if (mem->size > 0) {
+    //u64 loc = rnd() % mem->size;
+    //u64 len = 0;
+    ////printf("trying size=%llu loc=%llu mem.size=%llu\n", size, loc, mem->size);
+    ////printf("- is empty!\n");
+    //while (len < size && loc > 0 && mem->data[loc - 1] == NIL) {
+      //++len;
+      //--loc;
+    //}
+    //while (len < size && loc + len + 1 < mem->size && mem->data[loc + len] == NIL) {
+      //++len;
+    //}
+    ////printf("- space loc=%llu len=%llu\n", loc, len);
+    //if (len == size) {
+      //for (u64 i = 0; i < size; ++i) {
+        //mem->data[loc + i] = USE;
+      //}
+      ////printf("- realloc!\n");
+      //return loc;
+    //}
+  //}
+  //return 0;
+//}
 
 u64 alloc(Mem* mem, u64 size) {
   if (size == 0) {
@@ -292,40 +280,8 @@ void debug_print_lnk(Lnk x) {
     case LAM: printf("LAM"); break;
     case APP: printf("APP"); break;
     case PAR: printf("PAR"); break;
-    case CT0: printf("CT0"); break;
-    case CT1: printf("CT1"); break;
-    case CT2: printf("CT2"); break;
-    case CT3: printf("CT3"); break;
-    case CT4: printf("CT4"); break;
-    case CT5: printf("CT5"); break;
-    case CT6: printf("CT6"); break;
-    case CT7: printf("CT7"); break;
-    case CT8: printf("CT8"); break;
-    case CT9: printf("CT9"); break;
-    case CTA: printf("CTA"); break;
-    case CTB: printf("CTB"); break;
-    case CTC: printf("CTC"); break;
-    case CTD: printf("CTD"); break;
-    case CTE: printf("CTE"); break;
-    case CTF: printf("CTF"); break;
-    case CTG: printf("CTG"); break;
-    case FN0: printf("FN0"); break;
-    case FN1: printf("FN1"); break;
-    case FN2: printf("FN2"); break;
-    case FN3: printf("FN3"); break;
-    case FN4: printf("FN4"); break;
-    case FN5: printf("FN5"); break;
-    case FN6: printf("FN6"); break;
-    case FN7: printf("FN7"); break;
-    case FN8: printf("FN8"); break;
-    case FN9: printf("FN9"); break;
-    case FNA: printf("FNA"); break;
-    case FNB: printf("FNB"); break;
-    case FNC: printf("FNC"); break;
-    case FND: printf("FND"); break;
-    case FNE: printf("FNE"); break;
-    case FNF: printf("FNF"); break;
-    case FNG: printf("FNG"); break;
+    case CTR: printf("CTR"); break;
+    case FUN: printf("FUN"); break;
     case OP2: printf("OP2"); break;
     case U32: printf("U32"); break;
     case F32: printf("F32"); break;
@@ -386,10 +342,7 @@ void collect(Mem* mem, Lnk term) {
     case U32: {
       break;
     }
-    case CT0: case CT1: case CT2: case CT3: case CT4: case CT5: case CT6: case CT7:
-    case CT8: case CT9: case CTA: case CTB: case CTC: case CTD: case CTE: case CTF: case CTG:
-    case FN0: case FN1: case FN2: case FN3: case FN4: case FN5: case FN6: case FN7:
-    case FN8: case FN9: case FNA: case FNB: case FNC: case FND: case FNE: case FNF: case FNG: {
+    case CTR: case FUN: {
       u64 arity = get_ari(term);
       for (u64 i = 0; i < arity; ++i) {
         collect(mem, ask_arg(mem,term,i));
@@ -714,7 +667,7 @@ Lnk reduce(u64 tid, Mem* mem, u64 host) {
         if (get_tag(arg0) == U32) {
           return let_u32(tid, mem, host, term, arg0);
         }
-        if (get_tag(arg0) >= CT0 && get_tag(arg0) <= CTF) {
+        if (get_tag(arg0) == CTR) {
           return let_ctr(tid, mem, host, term, arg0);
         }
         break;
@@ -733,8 +686,7 @@ Lnk reduce(u64 tid, Mem* mem, u64 host) {
         }
         break;
       }
-      case FN0: case FN1: case FN2: case FN3: case FN4: case FN5: case FN6: case FN7:
-      case FN8: case FN9: case FNA: case FNB: case FNC: case FND: case FNE: case FNF: case FNG: {
+      case FUN: {
         //printf("- cal\n");
         u64 fun = get_ext(term);
         u64 ari = get_ari(term);
@@ -783,7 +735,7 @@ Lnk reduce(u64 tid, Mem* mem, u64 host) {
               matched = 1;
               for (u64 arg_index = 0; arg_index < rule.test.size; ++arg_index) {
                 u64 value = rule.test.data[arg_index];
-                if (get_tag(value) == CT0 && !(get_tag(args_data[arg_index]) >= CT0 && get_tag(args_data[arg_index]) <= CTG && get_ext(args_data[arg_index]) == get_ext(value))) {
+                if (get_tag(value) == CTR && !(get_tag(args_data[arg_index]) == CTR && get_ext(args_data[arg_index]) == get_ext(value))) {
                   //printf("- no match ctr %llu | %llu %llu\n", arg_index, get_ext(args_data[arg_index])/EXT, value/EXT);
                   matched = 0;
                   break;
@@ -857,10 +809,7 @@ Lnk normal_cont(u64 tid, Mem* mem, u64 host, u64* seen) {
         link(mem, get_loc(term,2), normal_cont(tid, mem, get_loc(term,2), seen));
         return term;
       }
-      case CT0: case CT1: case CT2: case CT3: case CT4: case CT5: case CT6: case CT7:
-      case CT8: case CT9: case CTA: case CTB: case CTC: case CTD: case CTE: case CTF: case CTG:
-      case FN0: case FN1: case FN2: case FN3: case FN4: case FN5: case FN6: case FN7:
-      case FN8: case FN9: case FNA: case FNB: case FNC: case FND: case FNE: case FNF: case FNG: {
+      case CTR: case FUN: {
         u64 arity = (u64)get_ari(term);
         if (CAN_SPAWN_WORKERS && arity > 1 && arity <= MAX_WORKERS) {
           CAN_SPAWN_WORKERS = 0;
@@ -1063,3 +1012,16 @@ u32 normal_ffi(u8* mem_data, u32 mem_size, u32 host) {
   return mem.size;
 
 }
+
+// Uncomment to test without Deno FFI
+//int main() {
+  //Mem mem;
+  //mem.size = 1;
+  //mem.data = (u64*)malloc(2 * 134217728 * sizeof(u64)); // 2gb
+  //mem.data[0] = Cal(0, $MAIN, 0);
+  //printf("Reducing...\n");
+  //normal_ffi((u8*)mem.data, mem.size, 0);
+  //printf("Done!\n");
+  //free(&mem.data);
+  //printf("rwt: %d\n", get_gas());
+//}
