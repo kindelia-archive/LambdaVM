@@ -61,7 +61,11 @@ typedef struct {
   u64* data;
 } Arr;
 
-typedef Arr Mem;
+typedef struct {
+  u64 size;
+  u64* data;
+  Arr free[8];
+} Mem;
 
 typedef struct {
   Arr test;
@@ -115,6 +119,29 @@ void array_push(Arr* arr, u64 value) {
 u64 array_pop(Arr* arr) {
   if (arr->size > 0) {
     return array_read(arr, --arr->size);
+  } else {
+    return -1;
+  }
+}
+
+// Memory
+// ------
+
+void mem_write(Mem* mem, u64 idx, u64 value) {
+  mem->data[idx] = value;
+}
+
+u64 mem_read(Mem* mem, u64 idx) {
+  return mem->data[idx];
+}
+
+void mem_push(Mem* mem, u64 value) {
+  mem_write(mem, mem->size++, value);
+}
+
+u64 mem_pop(Mem* mem) {
+  if (mem->size > 0) {
+    return mem_read(mem, --mem->size);
   } else {
     return -1;
   }
@@ -212,55 +239,37 @@ u64 get_loc(Lnk lnk, u64 arg) {
 }
 
 Lnk ask_arg(Mem* mem, Lnk term, u64 arg) {
-  return array_read(mem, get_loc(term, arg));
+  return mem_read(mem, get_loc(term, arg));
 }
 
 Lnk ask_lnk(Mem* mem, u64 loc) {
-  return array_read(mem, loc);
+  return mem_read(mem, loc);
 }
 
 u64 link(Mem* mem, u64 loc, Lnk lnk) {
-  array_write(mem, loc, lnk);
+  mem_write(mem, loc, lnk);
   if (get_tag(lnk) <= VAR) {
-    array_write(mem, get_loc(lnk, get_tag(lnk) == DP1 ? 1 : 0), Arg(loc));
+    mem_write(mem, get_loc(lnk, get_tag(lnk) == DP1 ? 1 : 0), Arg(loc));
   }
   return lnk;
 }
-
-//u64 reuse(Mem* mem, u64 size) {
-  //if (mem->size > 0) {
-    //u64 loc = rnd() % mem->size;
-    //u64 len = 0;
-    ////printf("trying size=%llu loc=%llu mem.size=%llu\n", size, loc, mem->size);
-    ////printf("- is empty!\n");
-    //while (len < size && loc > 0 && mem->data[loc - 1] == NIL) {
-      //++len;
-      //--loc;
-    //}
-    //while (len < size && loc + len + 1 < mem->size && mem->data[loc + len] == NIL) {
-      //++len;
-    //}
-    ////printf("- space loc=%llu len=%llu\n", loc, len);
-    //if (len == size) {
-      //for (u64 i = 0; i < size; ++i) {
-        //mem->data[loc + i] = USE;
-      //}
-      ////printf("- realloc!\n");
-      //return loc;
-    //}
-  //}
-  //return 0;
-//}
 
 u64 alloc(Mem* mem, u64 size) {
   if (size == 0) {
     return 0;
   } else {
-    return __atomic_fetch_add(&mem->size, size, __ATOMIC_RELAXED);
+    u64 reuse = array_pop(&mem->free[size]);
+    if (reuse != -1) {
+      return reuse;
+    } else {
+      return __atomic_fetch_add(&mem->size, size, __ATOMIC_RELAXED);
+    }
   }
 }
 
 void clear(Mem* mem, u64 loc, u64 size) {
+  //mem->free[size].data[mem->free[size].size++] = loc;
+  array_push(&mem->free[size], loc);
   // TODO
 }
 
@@ -602,7 +611,7 @@ Lnk cal_ctrs(
       u64 out = fld == 0xFF ? args.data[arg] : ask_arg(mem, args.data[arg], fld);
       link(mem, aloc + i, out);
     } else {
-      array_write(mem, aloc + i, lnk + (get_tag(lnk) < U32 ? aloc : 0));
+      mem_write(mem, aloc + i, lnk + (get_tag(lnk) < U32 ? aloc : 0));
     }
   }
   u64 root_lnk;
@@ -974,6 +983,10 @@ u32 normal_ffi(u8* mem_data, u32 mem_size, u32 host) {
   Mem mem;
   mem.data = (u64*)mem_data;
   mem.size = (u64)mem_size;
+  for (u64 i = 0; i < 8; ++i) {
+    mem.free[i].size = 0;
+    mem.free[i].data = malloc(256 * 1024 * 1024 * sizeof(u64));
+  }
   for (u64 t = 0; t < MAX_WORKERS; ++t) {
     workers[t].thread = NULL;
     workers[t].mem = &mem;
