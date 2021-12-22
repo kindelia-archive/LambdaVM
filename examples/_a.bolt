@@ -1,0 +1,26 @@
+(Filter fn (Cons x xs)) = (Filter.Cons (fn x) fn x xs)
+  (Filter.Cons 1 fn x xs) = (Cons x (Filter fn xs))
+  (Filter.Cons 0 fn x xs) = (Filter fn xs)
+(Filter fn (Nil)) = (Nil)
+
+(Concat (Nil)        b) = b
+(Concat (Cons ah at) b) = (Cons ah (Concat at b))
+
+(Quicksort (Nil)) = (Nil)
+(Quicksort (Cons h t)) =
+  let min = (Filter λx(< x h) t)
+  let max = (Filter λx(> x h) t)
+  (Concat (Quicksort min) (Cons h (Quicksort max)))
+
+(Generate seed 0) = (Nil)
+(Generate seed n) = (Cons seed (Generate (+ (* seed 1664525) 1013904223) (- n 1)))
+
+(Sum (Nil))       = 0
+(Sum (Cons x xs)) = (+ x (Sum xs))
+
+(Slow n) = (Slow.go n 0)
+  (Slow.go 0 r) = r
+  (Slow.go n r) = (Slow.go (- n 1) (+ r (Sum (Quicksort (Generate n 2500)))))
+
+(Main) = (Slow 200)
+

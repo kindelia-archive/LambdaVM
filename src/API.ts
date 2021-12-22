@@ -9,16 +9,8 @@ import * as Readback from "./Compile/Readback.ts"
 
 type Mode = "DYNAMIC" | "STATIC";
 
-//const MODE : Mode = "DYNAMIC";
-const MODE : Mode = "STATIC";
-
-function dylib_suffix() {
-  switch (Deno.build.os) {
-    case "windows": return "dll";
-    case "darwin": return "dylib";
-    case "linux": return "so";
-  }
-}
+const MODE : Mode = "DYNAMIC";
+//const MODE : Mode = "STATIC";
 
 async function build_runtime(file: Lambolt.File, target: string, mode: Mode) {
   var source_path = new URL("./Runtime/Runtime."+target, import.meta.url);
@@ -31,7 +23,7 @@ async function build_runtime(file: Lambolt.File, target: string, mode: Mode) {
 async function c_compile() {
   var bin = (new URL("./../bin/", import.meta.url)).pathname;
   var cm0 = ["clang", "-O3", "-c", "-o", bin+"Runtime.o", bin+"Runtime.c"];
-  var cm1 = ["clang", "-O3", "-shared", "-o", bin+"Runtime."+dylib_suffix(), bin+"Runtime.c"];
+  var cm1 = ["clang", "-O3", "-shared", "-o", bin+"Runtime.so", bin+"Runtime.c"];
   var st0 = await Deno.run({cmd: cm0}).status();
   var st1 = await Deno.run({cmd: cm1}).status();
   console.log(cm0.join(" "));
@@ -41,7 +33,7 @@ async function c_compile() {
 var c_dylib : any = null;
 function c_load_dylib() {
   if (c_dylib === null) {
-    var path = new URL("./../bin/Runtime." + dylib_suffix(), import.meta.url);
+    var path = new URL("./../bin/Runtime.so", import.meta.url);
     c_dylib = Deno.dlopen(path, {
       "normal_ffi": {
         parameters: ["buffer","u32", "u32"],
@@ -100,8 +92,6 @@ function c_add_dynbook(book: Runtime.Book) {
   }
 
   var dylib = c_load_dylib();
-
-  //console.log(JSON.stringify(book,null,2));
 
   // For each page
   for (var key in book) {

@@ -64,7 +64,7 @@ typedef struct {
 typedef struct {
   u64 size;
   u64* data;
-  Arr free[8];
+  Arr free[16];
 } Mem;
 
 typedef struct {
@@ -258,12 +258,13 @@ u64 alloc(Mem* mem, u64 size) {
   if (size == 0) {
     return 0;
   } else {
-    u64 reuse = array_pop(&mem->free[size]);
-    if (reuse != -1) {
-      return reuse;
-    } else {
-      return __atomic_fetch_add(&mem->size, size, __ATOMIC_RELAXED);
+    if (size < 16) {
+      u64 reuse = array_pop(&mem->free[size]);
+      if (reuse != -1) {
+        return reuse;
+      }
     }
+    return __atomic_fetch_add(&mem->size, size, __ATOMIC_RELAXED);
   }
 }
 
@@ -278,7 +279,7 @@ void clear(Mem* mem, u64 loc, u64 size) {
 
 void debug_print_lnk(Lnk x) {
   u64 tag = get_tag(x);
-  u64 ext = get_ext(x) / EXT;
+  u64 ext = get_ext(x);
   u64 val = get_val(x);
   switch (tag) {
     case DP0: printf("DP0"); break;
@@ -604,7 +605,7 @@ Lnk cal_ctrs(
   //printf("\n");
   for (u64 i = 0; i < size; ++i) {
     u64 lnk = body.data[i];
-    //printf("-- %llx: ", i); //debug_print_lnk(lnk); //printf("\n");
+    //printf("-- %llx: ", i); debug_print_lnk(lnk); printf("\n");
     if (get_tag(lnk) == OUT) {
       u64 arg = (lnk >> 8) & 0xFF;
       u64 fld = (lnk >> 0) & 0xFF;
@@ -717,8 +718,9 @@ Lnk reduce(u64 tid, Mem* mem, u64 host) {
         // -------------
 
         if (DYNAMIC) {
-          u64 page_index = fun / EXT;
+          u64 page_index = fun;
           Page page = BOOK[page_index];
+          //printf("- on term: "); debug_print_lnk(term); printf("\n");
           //printf("- BOOK[%llu].valid %llu\n", page_index, BOOK[page_index].valid);
           if (page.valid == 1) {
             //printf("- entering page...\n");
@@ -745,7 +747,7 @@ Lnk reduce(u64 tid, Mem* mem, u64 host) {
               for (u64 arg_index = 0; arg_index < rule.test.size; ++arg_index) {
                 u64 value = rule.test.data[arg_index];
                 if (get_tag(value) == CTR && !(get_tag(args_data[arg_index]) == CTR && get_ext(args_data[arg_index]) == get_ext(value))) {
-                  //printf("- no match ctr %llu | %llu %llu\n", arg_index, get_ext(args_data[arg_index])/EXT, value/EXT);
+                  //printf("- no match ctr %llu | %llu %llu\n", arg_index, get_ext(args_data[arg_index]), value);
                   matched = 0;
                   break;
                 }
@@ -983,7 +985,7 @@ u32 normal_ffi(u8* mem_data, u32 mem_size, u32 host) {
   Mem mem;
   mem.data = (u64*)mem_data;
   mem.size = (u64)mem_size;
-  for (u64 i = 0; i < 8; ++i) {
+  for (u64 i = 0; i < 16; ++i) {
     mem.free[i].size = 0;
     mem.free[i].data = malloc(256 * 1024 * 1024 * sizeof(u64));
   }

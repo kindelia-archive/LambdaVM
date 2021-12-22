@@ -1,67 +1,27 @@
 export type MAP<T> = Record<string, T>;
 
 // The LNK type is an union represented as a 64-bit BigInt.
-
-// NIL 00 00 00 00 00 00 00 00
-//
-// DP0 02 CC CC CC PP PP PP PP
-// DP1 03 CC CC CC PP PP PP PP
-// VAR 04 00 00 00 PP PP PP PP
-// ARG 05 00 00 00 PP PP PP PP
-// ERA 06 00 00 00 ?? ?? ?? ??
-// LAM 07 00 00 00 PP PP PP PP
-// APP 08 00 00 00 PP PP PP PP
-// PAR 09 00 00 00 PP PP PP PP
-//
-// CT0 20 FF FF FF PP PP PP PP
-// CT1 21 FF FF FF PP PP PP PP
-// CT2 22 FF FF FF PP PP PP PP
-// CT3 23 FF FF FF PP PP PP PP
-// CT4 24 FF FF FF PP PP PP PP
-// CT5 25 FF FF FF PP PP PP PP
-// CT6 26 FF FF FF PP PP PP PP
-// CT7 27 FF FF FF PP PP PP PP
-// CT8 28 FF FF FF PP PP PP PP
-// CT9 29 FF FF FF PP PP PP PP
-// CTA 2A FF FF FF PP PP PP PP
-// CTB 2B FF FF FF PP PP PP PP
-// CTC 2C FF FF FF PP PP PP PP
-// CTD 2D FF FF FF PP PP PP PP
-// CTE 2E FF FF FF PP PP PP PP
-// CTF 2F FF FF FF PP PP PP PP
-// CTG 30 FF FF FF PP PP PP PP
-//
-// FN0 40 FF FF FF PP PP PP PP
-// FN1 41 FF FF FF PP PP PP PP
-// FN2 42 FF FF FF PP PP PP PP
-// FN3 43 FF FF FF PP PP PP PP
-// FN4 44 FF FF FF PP PP PP PP
-// FN5 45 FF FF FF PP PP PP PP
-// FN6 46 FF FF FF PP PP PP PP
-// FN7 47 FF FF FF PP PP PP PP
-// FN8 48 FF FF FF PP PP PP PP
-// FN9 49 FF FF FF PP PP PP PP
-// FNA 4A FF FF FF PP PP PP PP
-// FNB 4B FF FF FF PP PP PP PP
-// FNC 4C FF FF FF PP PP PP PP
-// FND 4D FF FF FF PP PP PP PP
-// FNE 4E FF FF FF PP PP PP PP
-// FNF 4F FF FF FF PP PP PP PP
-// FNG 50 FF FF FF PP PP PP PP
-//
-// OP2 60 OO OO OO PP PP PP PP
-//
-// U32 F0 00 00 00 VV VV VV VV
-// F32 F1 00 00 00 VV VV VV VV
-// OUT FF 00 00 00 00 00 XX YY
-
-// P = position
-// C = color
-// F = function
-// O = operation
-// V = value
-// X = argument
-// Y = field
+// struct Lnk {
+//   u64 tag: 4;
+//   u64 ari: 4;
+//   u64 ext: 24;
+//   u64 pos: 32;
+// }
+// DP0 00 CC CC CC PP PP PP PP (c = col, p = pos)
+// DP1 10 CC CC CC PP PP PP PP (c = col, p = pos)
+// VAR 20 00 00 00 PP PP PP PP (p = pos)
+// ARG 30 00 00 00 PP PP PP PP (p = pos) 
+// ERA 40 00 00 00 00 00 00 00
+// LAM 50 00 00 00 PP PP PP PP (p = pos)
+// APP 60 00 00 00 PP PP PP PP (p = pos)
+// PAR 70 00 00 00 PP PP PP PP (p = pos)
+// CTR 8A FF FF FF PP PP PP PP (a = ari, f = fun, p = pos)
+// CAL 9A FF FF FF PP PP PP PP (a = ari, f = fun, p = pos)
+// OP2 A0 OO OO OO PP PP PP PP (o = ope, p = pos)
+// U32 B0 00 00 00 VV VV VV VV (v = val)
+// F32 C0 00 00 00 VV VV VV VV (v = val)
+// U64 D0 00 00 00 PP PP PP PP (p = pos)
+// F64 E0 00 00 00 PP PP PP PP (p = pos)
 
 export const VAL : bigint = 2n ** 0n;
 export const EXT : bigint = 2n ** 32n;
@@ -686,15 +646,13 @@ function cal_ctrs(
   return done;
 }
 
-import * as D from "./Debug.ts"
-
 export function reduce(mem: Mem, host: bigint) : Lnk {
   main: while (true) {
     var term = ask_lnk(mem, host);
     //console.log("reduce " + get_tag(term)/TAG + ":" + get_ext(term)/EXT + ":" + get_val(term));
     //console.log("reduce " + D.debug_show_lnk(term));
     //console.log("reduce");
-    //console.log("- main: " + D.debug_show(mem,ask_lnk(mem,0n),{}));
+    //console.log("- main: " + debug_show(mem,ask_lnk(mem,0n),{}));
     //console.log("- term: " + D.debug_show(mem,ask_lnk(mem,host),{}));
     //console.log((function() { var lnks = []; for (var i = 0; i < 26; ++i) { lnks.push(ask_lnk(mem, i)); } return lnks.map(debug_show_lnk).join("|"); })());
     switch (get_tag(term)) {
@@ -767,7 +725,7 @@ export function reduce(mem: Mem, host: bigint) : Lnk {
         // -------------
         
         if (DYNAMIC) {
-          var page = BOOK[String(fun/EXT)];
+          var page = BOOK[String(fun)];
           if (page) {
             //console.log("- got entry...");
             var args = [];
@@ -795,7 +753,9 @@ export function reduce(mem: Mem, host: bigint) : Lnk {
                   //console.log("-- fail (num doesn't match)");
                   continue try_rule;
                 }
+                //console.log("-- okay");
               }
+              //console.log("- matched", rule);
               cal_ctrs(mem, host, rule.clrs, rule.cols, rule.root, rule.body, term, args);
               continue main;
             }
@@ -874,3 +834,173 @@ export function normal(mem: Mem, host: bigint) : number {
   //free(&mem.data);
   //printf("rwt: %d\n", get_gas());
 //}
+//
+
+// Debug
+// -----
+
+export function debug_show_lnk(x: Lnk): String {
+  var tag = get_tag(x);
+  var ext = (get_ext(x)).toString(16);
+  var val = get_val(x).toString(16);
+  var ini = (function() {
+    switch (tag) {
+      case DP0: return "DP0";
+      case DP1: return "DP1";
+      case VAR: return "VAR";
+      case ARG: return "ARG";
+      case ERA: return "ERA";
+      case LAM: return "LAM";
+      case APP: return "APP";
+      case PAR: return "PAR";
+      case CTR: return "CTR";
+      case FUN: return "FUN";
+      case OP2: return "OP2";
+      case U32: return "U32";
+      case F32: return "F32";
+      case OUT: return "OUT";
+      case NIL: return "NIL";
+      default: return (tag).toString(16);
+    }
+  })();
+  return ini+":"+ext+":"+val;
+}
+
+export function debug_show(mem: Mem, term: Lnk, table: {[str:string]:string}) : string {
+  var lets : {[key:string]:bigint} = {};
+  var kinds : {[key:string]:bigint} = {};
+  var names : {[key:string]:string} = {};
+  var count = 0;
+  function find_lets(term: Lnk) {
+    switch (get_tag(term)) {
+      case LAM: {
+        names[String(get_loc(term,0))] = String(++count);
+        find_lets(ask_arg(mem, term, 1));
+        break;
+      }
+      case APP: {
+        find_lets(ask_arg(mem, term, 0));
+        find_lets(ask_arg(mem, term, 1));
+        break;
+      }
+      case PAR: {
+        find_lets(ask_arg(mem, term, 0));
+        find_lets(ask_arg(mem, term, 1));
+        break;
+      }
+      case DP0: {
+        if (!lets[String(get_loc(term,0))]) {
+          names[String(get_loc(term,0))] = String(++count);
+          kinds[String(get_loc(term,0))] = get_ext(term);
+          lets[String(get_loc(term,0))] = get_loc(term,0);
+          find_lets(ask_arg(mem, term, 2));
+        }
+        break;
+      }
+      case DP1: {
+        if (!lets[String(get_loc(term,0))]) {
+          names[String(get_loc(term,0))] = String(++count);
+          kinds[String(get_loc(term,0))] = get_ext(term);
+          lets[String(get_loc(term,0))] = get_loc(term,0);
+          find_lets(ask_arg(mem, term, 2));
+        }
+        break;
+      }
+      case OP2: {
+        find_lets(ask_arg(mem, term, 0));
+        find_lets(ask_arg(mem, term, 1));
+        break;
+      }
+      case CTR: case FUN: {
+        var arity = get_ari(term);
+        for (var i = 0; i < arity; ++i) {
+          find_lets(ask_arg(mem, term,i));
+        }
+        break;
+      }
+    }
+  }
+  function go(term: Lnk) : string {
+    switch (get_tag(term)) {
+      case DP0: {
+        return "a" + (names[String(get_loc(term,0))] || "?");
+      }
+      case DP1: {
+        return "b" + (names[String(get_loc(term,0))] || "?");
+      }
+      case VAR: {
+        return "x" + (names[String(get_loc(term,0))] || "?");
+      }
+      case LAM: {
+        var name = "x" + (names[String(get_loc(term,0))] || "?");
+        return "λ" + name + " " + go(ask_arg(mem, term, 1));
+      }
+      case APP: {
+        let func = go(ask_arg(mem, term, 0));
+        let argm = go(ask_arg(mem, term, 1));
+        return "(" + func + " " + argm + ")";
+      }
+      case PAR: {
+        let kind = get_ext(term);
+        let func = go(ask_arg(mem, term, 0));
+        let argm = go(ask_arg(mem, term, 1));
+        return "&" + (kind) + "<" + func + " " + argm + ">";
+      }
+      case OP2: {
+        let oper = get_ext(term);
+        let val0 = go(ask_arg(mem, term, 0));
+        let val1 = go(ask_arg(mem, term, 1));
+        var symb = "?";
+        switch (oper) {
+          case 0x00n: symb = "+"; break;
+          case 0x01n: symb = "-"; break;
+          case 0x02n: symb = "*"; break;
+          case 0x03n: symb = "/"; break;
+          case 0x04n: symb = "%"; break;
+          case 0x05n: symb = "&"; break;
+          case 0x06n: symb = "|"; break;
+          case 0x07n: symb = "^"; break;
+          case 0x08n: symb = "<<"; break;
+          case 0x09n: symb = ">>"; break;
+          case 0x10n: symb = "<"; break;
+          case 0x11n: symb = "<="; break;
+          case 0x12n: symb = "="; break;
+          case 0x13n: symb = ">="; break;
+          case 0x14n: symb = ">"; break;
+          case 0x15n: symb = "!="; break;
+        }
+        return "(" + symb + " " + val0 + " " + val1 + ")";
+      }
+      case U32: {
+        return "" + get_val(term);
+      }
+      case CTR: case FUN: {
+        let func = get_ext(term);
+        let arit = get_ari(term);
+        let args = [];
+        for (let i = 0; i < arit; ++i) {
+          args.push(go(ask_arg(mem, term, i)));
+        }
+        if (table && table[String(func)]) {
+          return "(" + (table[String(func)]||"?") + args.map(x => " " + x).join("") + ")";
+        } else {
+          var c = get_tag(term) < FUN ? "C" : "F";
+          return "(" + c + (func) + args.map(x => " " + x).join("") + ")";
+        }
+      }
+    }
+    return "<?" + term + ">";
+  }
+  find_lets(term);
+  var text = go(term);
+  for (var key of Object.keys(lets).reverse()) {
+    var pos  = lets[key];
+    var kind = kinds[key] || 0;
+    var name = names[String(pos)] || "?";
+    var nam0 = ask_lnk(mem, pos+0n) === Era() ? "*" : "a"+name;
+    var nam1 = ask_lnk(mem, pos+1n) === Era() ? "*" : "b"+name;
+    text += " !" + kind + "<"+nam0+" "+nam1+"> = " + go(ask_lnk(mem, pos + 2n)) + ";";
+  }
+  //text += go(term);
+  return text;
+}

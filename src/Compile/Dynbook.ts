@@ -91,11 +91,11 @@ export function compile_group(
           var term = rule.lhs.args[i];
           switch (term.$) {
             case "Ctr": {
-              page.rules[r].test.push(R.CTR + name_table[term.name]);
+              page.rules[r].test.push(R.Ctr(0, name_table[term.name], 0n));
               break;
             }
             case "U32": {
-              page.rules[r].test.push(R.U32 + BigInt(term.numb));
+              page.rules[r].test.push(R.U_32(BigInt(term.numb)));
               break;
             }
             case "Var": {

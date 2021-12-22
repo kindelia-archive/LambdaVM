@@ -1,0 +1,18 @@
+(Slow (E))      = 1
+(Slow (O pred)) = (+ (Slow pred) (Slow pred))
+(Slow (I pred)) = (+ (Slow pred) (Slow pred))
+
+//(Main) = (λx x λx x λx x)
+
+(Main) = (Tuple
+  //(Slow (O(O(O(E)))))
+  //(Slow (O(O(O(O(O(O(E))))))))
+  (Slow (O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(E))))))))))))))))))))))))))))
+  //(Slow (O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(I(E))))))))))))))))))))))))))))
+  //(Slow (O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(I(O(E))))))))))))))))))))))))))))
+  //(Slow (O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(I(I(E))))))))))))))))))))))))))))
+  //(Slow (O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(I(O(O(E))))))))))))))))))))))))))))
+  //(Slow (O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(I(O(I(E))))))))))))))))))))))))))))
+  //(Slow (O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(I(I(O(E))))))))))))))))))))))))))))
+  //(Slow (O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(O(I(I(I(E))))))))))))))))))))))))))))
+)

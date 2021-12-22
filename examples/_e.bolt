@@ -1,0 +1,4 @@
+(Not (True)) = (False)
+(Not (False)) = (True)
+
+(Main) = (Not (Not (Not (True))))
