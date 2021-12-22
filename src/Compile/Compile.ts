@@ -3,11 +3,13 @@ import * as L from "https://raw.githubusercontent.com/Kindelia/Lambolt/master/sr
 import {gen_name_table, gen_is_call, gen_groups, sanitize} from "./Common.ts"
 export * from "./Common.ts"
 
+// OK
+
 // Compiler
 // --------
 
 // Compiles a Lambolt file to a target language.
-export function compile(file: L.File, target: string, mode: "DYNAMIC" | "STATIC", template: string) {
+export function compile(file: L.File, target: string, mode: "DYNAMIC" | "STATIC", template: string): string {
   //console.log("Compiling file...");
 
   // Generates the name table.
@@ -20,7 +22,8 @@ export function compile(file: L.File, target: string, mode: "DYNAMIC" | "STATIC"
   var groups = gen_groups(file);
 
   // Compiles dynamic flag.
-  var dynamic_flag = "DYNAMIC = " + (mode === "DYNAMIC" ? 1 : 0) + ";\n";
+  var use_dynamic_flag = USE_DYNAMIC(target, mode === "DYNAMIC");
+  var use_static_flag = USE_STATIC(target, mode === "STATIC");
 
   // Compiles constructor ids.
   var constructor_ids = "";
@@ -29,22 +32,78 @@ export function compile(file: L.File, target: string, mode: "DYNAMIC" | "STATIC"
   }
 
   // Compiles each group's rewrite rules.
-  var rewrite_rules = "";
+  var rewrite_rules_step_0 = "";
   for (var group_name in groups) {
-    rewrite_rules += compile_group(group_name, groups[group_name][0], groups[group_name][1], name_table, is_call, target, 6);
+    rewrite_rules_step_0 += compile_group_step_0(group_name, groups[group_name][0], groups[group_name][1], name_table, is_call, target, 6);
+  }
+
+  var rewrite_rules_step_1 = "";
+  for (var group_name in groups) {
+    rewrite_rules_step_1 += compile_group_step_1(group_name, groups[group_name][0], groups[group_name][1], name_table, is_call, target, 6);
   }
 
   //console.log(constructor_ids);
   //console.log(rewrite_rules);
 
   return template
-    .replace("//GENERATED_DYNAMIC_FLAG//", dynamic_flag)
-    .replace("//GENERATED_REWRITE_RULES//", rewrite_rules)
+    .replace("//GENERATED_USE_DYNAMIC_FLAG//", use_dynamic_flag)
+    .replace("//GENERATED_USE_STATIC_FLAG//", use_static_flag)
+    .replace("//GENERATED_REWRITE_RULES_STEP_0//", rewrite_rules_step_0)
+    .replace("//GENERATED_REWRITE_RULES_STEP_1//", rewrite_rules_step_1)
     .replace("//GENERATED_CONSTRUCTOR_IDS//", constructor_ids);
 }
 
 // Compiles a group of rules to the target language.
-export function compile_group(
+export function compile_group_step_0(
+  name: string,
+  arity: number,
+  rules: Array<L.Rule>,
+  name_table: {[name:string]:bigint},
+  is_call: {[name:string]:boolean},
+  target: string,
+  tab: number
+): string {
+  function compile_group(name: string, arity: number, rules: Array<{rule:L.Rule,uses:{[key:string]:number}}>, tab: number) {
+    text += line(tab, "case " + compile_constructor_name(name) + ": {");
+    var reduce_at : {[key:string]:boolean} = {};
+    for (var {rule,uses} of rules) {
+      if (rule.lhs.$ === "Ctr") {
+        for (var i = 0; i < rule.lhs.args.length; ++i) {
+          if (rule.lhs.args[i].$ === "Ctr" || rule.lhs.args[i].$ === "U32") {
+            reduce_at[i] = true;
+          }
+        }
+      }
+    }
+    var stricts = [];
+    for (var i = 0; i < arity; ++i) {
+      if (reduce_at[i]) {
+        stricts.push(i);
+      }
+    }
+    if (stricts.length === 0) {
+      text += line(tab+1, "init = 0;");
+      text += line(tab+1, "continue;");
+    } else {
+      text += line(tab+1, "stack[size++] = host;");
+      for (var i = 0; i < stricts.length; ++i) {
+        if (i < stricts.length - 1) {
+          text += line(tab+1, "stack[size++] = get_loc(term, "+stricts[i]+") | 0x80000000;");
+        } else {
+          text += line(tab+1, "host = get_loc(term, "+stricts[i]+");");
+        }
+      }
+      text += line(tab+1, "continue;");
+    }
+    text += line(tab, "}");
+  }
+  var text = "";
+  compile_group(name, arity, rules.map(sanitize), tab);
+  return text;
+}
+
+// Compiles a group of rules to the target language.
+export function compile_group_step_1(
   name: string,
   arity: number,
   rules: Array<L.Rule>,
@@ -87,11 +146,11 @@ export function compile_group(
       text += line(tab+1, VAR(target) + " LOC_"+i+" = get_loc(term,"+i+");");
     }
     for (var i = 0; i < arity; ++i) {
+      text += line(tab+1, VAR(target)+" LNK_"+i+" = ask_arg(mem, term, "+i+");");
       if (reduce_at[i]) {
-        text += line(tab+1, VAR(target)+" LNK_"+i+" = reduce("+TID(target)+"mem, LOC_"+i+");");
-        text += line(tab+1, "if (get_tag(LNK_"+i+") == PAR) return cal_par("+TID(target)+"mem, host, term, LNK_"+i+", "+i+");");
-      } else {
-        text += line(tab+1, VAR(target)+" LNK_"+i+" = ask_arg(mem, term, "+i+");");
+        text += line(tab+1, "if (get_tag(LNK_"+i+") == PAR) {");
+        text += line(tab+1, "  cal_par("+TID(target)+"mem, host, term, LNK_"+i+", "+i+");");
+        text += line(tab+1, "}");
       }
     }
 
@@ -188,7 +247,11 @@ export function compile_group(
         }
 
         // And we're done! WP.
+        //text += line(tab+2, "continue;");
+        text += line(tab+2, "host = host;");
+        text += line(tab+2, "init = 1;");
         text += line(tab+2, "continue;");
+        //text += line(tab+2, "stack[count++] = host << 1;");
         text += line(tab+1, "}");
       } else {
         throw "Invalid left-hand side.";
@@ -338,4 +401,20 @@ function TID(target: string) {
     case "ts": return "";
     case "c": return "tid, ";
   }
+}
+
+function USE_DYNAMIC(target: string, use_dynamic: boolean): string {
+  switch (target) {
+    case "ts": return "USE_DYNAMIC = " + (use_dynamic ? "true" : "false") + ";";
+    case "c": return use_dynamic ? "#define USE_DYNAMIC" : "#undef USE_DYNAMIC";
+  }
+  return "?";
+}
+
+function USE_STATIC(target: string, use_static: boolean): string {
+  switch (target) {
+    case "ts": return "USE_STATIC = " + (use_static ? "true" : "false") + ";";
+    case "c": return use_static ? "#define USE_STATIC" : "#undef USE_STATIC";
+  }
+  return "?";
 }

@@ -20,7 +20,7 @@
 
 (Slow n) = (Slow.go n 0)
   (Slow.go 0 r) = r
-  (Slow.go n r) = (Slow.go (- n 1) (+ r (Sum (Quicksort (Generate n 2500)))))
+  (Slow.go n r) = (Slow.go (- n 1) (+ r (Sum (Quicksort (Generate n 400000)))))
 
-(Main) = (Slow 200)
+(Main) = (Slow 2)
 

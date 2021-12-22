@@ -65,7 +65,10 @@ export const NEQ : bigint = 0xFn;
 //GENERATED_CONSTRUCTOR_IDS//
 //GENERATED_CONSTRUCTOR_IDS_END//
 
-var DYNAMIC : number = 0;
+var USE_DYNAMIC : boolean;
+var USE_STATIC : boolean;
+//GENERATED_USE_DYNAMIC_FLAG//
+//GENERATED_USE_STATIC_FLAG//
 
 export type Lnk = bigint // U52 in JS, U64 in C
 
@@ -224,6 +227,15 @@ export function link(mem: Mem, loc: bigint, lnk: Lnk) : Lnk {
   return lnk;
 }
 
+export function init(capacity: number = 2 ** 29) {
+  var mem = array_alloc(capacity);
+  array_push(mem, 0n);
+  return mem;
+}
+
+// ------------------------------------------------------------
+
+/*
 export function alloc(mem: Mem, size: number) : bigint {
   if (size === 0) {
     return 0n;
@@ -239,12 +251,6 @@ export function clear(mem: Mem, loc: bigint, size: number) {
 }
 
 // ~~~
-
-export function init(capacity: number = 2 ** 29) {
-  var mem = array_alloc(capacity);
-  array_push(mem, 0n);
-  return mem;
-}
 
 // Garbage Collection
 // ------------------
@@ -712,7 +718,7 @@ export function reduce(mem: Mem, host: bigint) : Lnk {
         // Static rules
         // ------------
         
-        if (!DYNAMIC) {
+        if (USE_STATIC) {
           switch (fun)
           //GENERATED_REWRITE_RULES_START//
           {
@@ -724,7 +730,7 @@ export function reduce(mem: Mem, host: bigint) : Lnk {
         // Dynamic rules
         // -------------
         
-        if (DYNAMIC) {
+        if (USE_DYNAMIC) {
           var page = BOOK[String(fun)];
           if (page) {
             //console.log("- got entry...");
@@ -761,6 +767,7 @@ export function reduce(mem: Mem, host: bigint) : Lnk {
             }
           }
         }
+
         break;
       }
     }
@@ -816,7 +823,6 @@ function normal_go(mem: Mem, host: bigint, seen: MAP<boolean>) : Lnk {
 }
 
 export function normal(mem: Mem, host: bigint) : number {
-  //GENERATED_DYNAMIC_FLAG//
   GAS = 0;
   normal_go(mem, host, {});
   return GAS;
@@ -1004,3 +1010,4 @@ export function debug_show(mem: Mem, term: Lnk, table: {[str:string]:string}) : 
   //text += go(term);
   return text;
 }
+*/

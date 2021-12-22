@@ -1,4 +1,5 @@
 (Not (True)) = (False)
 (Not (False)) = (True)
 
-(Main) = (Not (Not (Not (True))))
+//(Main) = ((λf λx (f (f x))) (λf λx (f (f x))))
+(Main) = (Not (Not (True)))

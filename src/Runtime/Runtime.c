@@ -52,7 +52,8 @@ const u64 NEQ = 0xF;
 //GENERATED_CONSTRUCTOR_IDS//
 //GENERATED_CONSTRUCTOR_IDS_END//
 
-u64 DYNAMIC = 0;
+//GENERATED_USE_DYNAMIC_FLAG//
+//GENERATED_USE_STATIC_FLAG//
 
 typedef u64 Lnk;
 
@@ -89,6 +90,7 @@ typedef struct {
   Mem* mem;
   u64 gas;
   u64 host;
+  u32* stack;
 } Worker;
 
 const u64 BOOK_SIZE = 65536;
@@ -639,106 +641,173 @@ Lnk cal_ctrs(
   return done;
 }
 
-Lnk reduce(u64 tid, Mem* mem, u64 host) {
+Lnk reduce(u64 tid, Mem* mem, u64 root) {
+  u32* stack = workers[tid].stack;
+
+  u64 init = 1;
+  u64 size = 1;
+  u32 host = (u32)root;
+
   while (1) {
+
     u64 term = ask_lnk(mem, host);
-    //printf("reduce %llu:%llu:%llu", get_tag(term)/TAG, get_ext(term)/EXT, get_val(term));
-    switch (get_tag(term)) {
-      case APP: {
-        u64 arg0 = reduce(tid, mem, get_loc(term,0));
-        switch (get_tag(arg0)) {
-          case LAM: {
-            app_lam(tid, mem, host, term, arg0);
-            continue;
-          }
-          case PAR: {
-            return app_par(tid, mem, host, term, arg0);
-          }
+
+    //printf("reducing host=%d size=%llu cont=%llu ", host, size, cont); debug_print_lnk(term); printf("\n");
+    //for (u64 i = 0; i < size; ++i) {
+      //printf("- %llu ", stack[i]); debug_print_lnk(ask_lnk(mem, stack[i]>>1)); printf("\n");
+    //}
+    
+    if (init == 1) {
+      switch (get_tag(term)) {
+        case APP: {
+          stack[size++] = host;
+          init = 1;
+          host = get_loc(term, 0);
+          continue;
         }
-        break;
-      }
-      case DP0:
-      case DP1: {
-        u64 arg0 = reduce(tid, mem, get_loc(term,2));
-        switch (get_tag(arg0)) {
-          case LAM: {
-            let_lam(tid, mem, host, term, arg0);
-            continue;
+        case DP0:
+        case DP1: {
+          stack[size++] = host;
+          host = get_loc(term, 2);
+          continue;
+        }
+        case OP2: {
+          stack[size++] = host;
+          stack[size++] = get_loc(term, 0) | 0x80000000;
+          host = get_loc(term, 1);
+          continue;
+        }
+        case FUN: {
+          u64 fun = get_ext(term);
+          u64 ari = get_ari(term);
+          
+          // Static rules
+          // ------------
+          
+          #ifdef USE_STATIC
+          switch (fun)
+          //GENERATED_REWRITE_RULES_STEP_0_START//
+          {
+//GENERATED_REWRITE_RULES_STEP_0//
           }
-          case PAR: {
-            if (get_ext(term) == get_ext(arg0)) {
-              let_par_eq(tid, mem, host, term, arg0);
+          //GENERATED_REWRITE_RULES_STEP_0_END//
+          #endif
+
+          // Dynamic rules
+          // -------------
+
+          #ifdef USE_DYNAMIC
+          Page page = BOOK[fun];
+          if (page.valid == 1) {
+            stack[size++] = host;
+            for (u64 arg_index = 0; arg_index < page.match.size; ++arg_index) {
+              if (page.match.data[arg_index] > 0) {
+                //printf("- ue %llu\n", arg_index);
+                stack[size++] = get_loc(term, arg_index) | 0x80000000;
+              }
+            }
+            break;
+          }
+          #endif
+
+          break;
+        }
+      }
+
+    } else {
+
+      switch (get_tag(term)) {
+        case APP: {
+          u64 arg0 = ask_arg(mem, term, 0);
+          switch (get_tag(arg0)) {
+            case LAM: {
+              app_lam(tid, mem, host, term, arg0);
+              init = 1;
               continue;
-            } else {
-              return let_par_df(tid, mem, host, term, arg0);
+            }
+            case PAR: {
+              app_par(tid, mem, host, term, arg0);
+              break;
             }
           }
+          break;
         }
-        if (get_tag(arg0) == U32) {
-          return let_u32(tid, mem, host, term, arg0);
-        }
-        if (get_tag(arg0) == CTR) {
-          return let_ctr(tid, mem, host, term, arg0);
-        }
-        break;
-      }
-      case OP2: {
-        u64 arg0 = reduce(tid, mem, get_loc(term,0));
-        u64 arg1 = reduce(tid, mem, get_loc(term,1));
-        if (get_tag(arg0) == U32 && get_tag(arg1) == U32) {
-          return op2_u32_u32(tid, mem, host, term, arg0, arg1);
-        }
-        if (get_tag(arg0) == PAR) {
-          return op2_par_0(tid, mem, host, term, arg0, arg1);
-        }
-        if (get_tag(arg1) == PAR) {
-          return op2_par_1(tid, mem, host, term, arg0, arg1);
-        }
-        break;
-      }
-      case FUN: {
-        //printf("- cal\n");
-        u64 fun = get_ext(term);
-        u64 ari = get_ari(term);
-        //printf("- call fun %llu\n", fun);
-        
-        // Static rules
-        // ------------
-        
-        if (!DYNAMIC) {
-          switch (fun)
-          //GENERATED_REWRITE_RULES_START//
-          {
-//GENERATED_REWRITE_RULES//
+        case DP0:
+        case DP1: {
+          u64 arg0 = ask_arg(mem, term, 2);
+          switch (get_tag(arg0)) {
+            case LAM: {
+              let_lam(tid, mem, host, term, arg0);
+              init = 1;
+              continue;
+            }
+            case PAR: {
+              if (get_ext(term) == get_ext(arg0)) {
+                let_par_eq(tid, mem, host, term, arg0);
+                init = 1;
+                continue;
+              } else {
+                let_par_df(tid, mem, host, term, arg0);
+                break;
+              }
+            }
           }
-          //GENERATED_REWRITE_RULES_END//
+          if (get_tag(arg0) == U32) {
+            let_u32(tid, mem, host, term, arg0);
+            break;
+          }
+          if (get_tag(arg0) == CTR) {
+            let_ctr(tid, mem, host, term, arg0);
+            break;
+          }
+          break;
         }
+        case OP2: {
+          u64 arg0 = ask_arg(mem, term, 0);
+          u64 arg1 = ask_arg(mem, term, 1);
+          if (get_tag(arg0) == U32 && get_tag(arg1) == U32) {
+            op2_u32_u32(tid, mem, host, term, arg0, arg1);
+            break;
+          }
+          if (get_tag(arg0) == PAR) {
+            op2_par_0(tid, mem, host, term, arg0, arg1);
+            break;
+          }
+          if (get_tag(arg1) == PAR) {
+            op2_par_1(tid, mem, host, term, arg0, arg1);
+            break;
+          }
+          break;
+        }
+        case FUN: {
+          u64 fun = get_ext(term);
+          u64 ari = get_ari(term);
 
-        // Dynamic rules
-        // -------------
+          #ifdef USE_STATIC
+          switch (fun)
+          //GENERATED_REWRITE_RULES_STEP_1_START//
+          {
+//GENERATED_REWRITE_RULES_STEP_1//
+          }
+          //GENERATED_REWRITE_RULES_STEP_1_END//
+          #endif
 
-        if (DYNAMIC) {
-          u64 page_index = fun;
-          Page page = BOOK[page_index];
+          #ifdef USE_DYNAMIC
+          Page page = BOOK[fun];
           //printf("- on term: "); debug_print_lnk(term); printf("\n");
-          //printf("- BOOK[%llu].valid %llu\n", page_index, BOOK[page_index].valid);
+          //printf("- BOOK[%llu].valid %llu\n", fun, BOOK[fun].valid);
           if (page.valid == 1) {
             //printf("- entering page...\n");
             u64 args_data[page.match.size];
-            //printf("?a\n");
             for (u64 arg_index = 0; arg_index < page.match.size; ++arg_index) {
               //printf("- strict arg %llu\n", arg_index);
-              if (page.match.data[arg_index] > 0) {
-                args_data[arg_index] = reduce(tid, mem, get_loc(term, arg_index));
-                if (get_tag(args_data[arg_index]) == PAR) {
-                  return cal_par(tid, mem, host, term, args_data[arg_index], arg_index);
-                }
-              } else {
-                args_data[arg_index] = ask_lnk(mem, get_loc(term, arg_index));
+              args_data[arg_index] = ask_arg(mem, term, arg_index);
+              if (get_tag(args_data[arg_index]) == PAR) {
+                cal_par(tid, mem, host, term, args_data[arg_index], arg_index);
+                break;
               }
             }
             //printf("- page has: %llu rules\n", page.count);
-            //printf("?b\n");
             u64 matched = 0;
             for (u64 rule_index = 0; rule_index < page.count; ++rule_index) {
               //printf("- trying to match rule %llu\n", rule_index);
@@ -759,22 +828,36 @@ Lnk reduce(u64 tid, Mem* mem, u64 host) {
               }
               if (matched) {
                 Arr args = (Arr){page.match.size, args_data};
-                //printf("cal_ctrs\n");
+                //printf("- cal_ctrs\n");
                 cal_ctrs(tid, mem, host, rule.clrs, rule.cols, rule.root, rule.body, term, args);
                 break;
               }
             }
             if (matched) {
+              //printf("- continue\n");
+              init = 1;
               continue;
             }
           }
+          #endif
+
+          break;
         }
-        break;
       }
     }
-    //printf("quit\n");
-    return term;
+
+    if (size > 0) {
+      u64 item = stack[--size];
+      init = item >> 31;
+      host = item & 0x7FFFFFFF;
+      continue;
+    } else {
+      break;
+    }
+
   }
+
+  return ask_lnk(mem, root);
 }
 
 // sets the nth bit of a bit-array represented as a u64 array
@@ -792,6 +875,7 @@ void normal_join(u64 tid);
 
 Lnk normal_cont(u64 tid, Mem* mem, u64 host, u64* seen) {
   Lnk term = ask_lnk(mem, host);
+  //printf("normal "); debug_print_lnk(term); printf("\n");
   if (get_bit(seen, host)) {
     return term;
   } else {
@@ -979,8 +1063,6 @@ void dynbook_page_add_rule_ffi(
 
 u32 normal_ffi(u8* mem_data, u32 mem_size, u32 host) {
 
-  //GENERATED_DYNAMIC_FLAG//
-
   // Init thread objects
   Mem mem;
   mem.data = (u64*)mem_data;
@@ -993,6 +1075,7 @@ u32 normal_ffi(u8* mem_data, u32 mem_size, u32 host) {
     workers[t].thread = NULL;
     workers[t].mem = &mem;
     workers[t].gas = 0;
+    workers[t].stack = malloc(64 * 1024 * 1024 * sizeof(u64)); // 64 MB
   }
 
   // Inits dynbook
@@ -1022,7 +1105,9 @@ u32 normal_ffi(u8* mem_data, u32 mem_size, u32 host) {
   }
 
   // Clear thread objects
-  // TODO?
+  for (u64 t = 0; t < MAX_WORKERS; ++t) {
+    free(workers[t].stack);
+  }
   
   return mem.size;
 

@@ -9,8 +9,8 @@ import * as Readback from "./Compile/Readback.ts"
 
 type Mode = "DYNAMIC" | "STATIC";
 
-const MODE : Mode = "DYNAMIC";
-//const MODE : Mode = "STATIC";
+//const MODE : Mode = "DYNAMIC";
+const MODE : Mode = "STATIC";
 
 async function build_runtime(file: Lambolt.File, target: string, mode: Mode) {
   var source_path = new URL("./Runtime/Runtime."+target, import.meta.url);
@@ -22,12 +22,9 @@ async function build_runtime(file: Lambolt.File, target: string, mode: Mode) {
 
 async function c_compile() {
   var bin = (new URL("./../bin/", import.meta.url)).pathname;
-  var cm0 = ["clang", "-O3", "-c", "-o", bin+"Runtime.o", bin+"Runtime.c"];
-  var cm1 = ["clang", "-O3", "-shared", "-o", bin+"Runtime.so", bin+"Runtime.c"];
-  var st0 = await Deno.run({cmd: cm0}).status();
-  var st1 = await Deno.run({cmd: cm1}).status();
-  console.log(cm0.join(" "));
-  console.log(cm1.join(" "));
+  var cmd = "clang -O3 -shared -o "+bin+"Runtime.so "+bin+"Runtime.c";
+  var stt = await Deno.run({cmd: cmd.split(" ")}).status();
+  console.log(cmd);
 }
 
 var c_dylib : any = null;
@@ -57,17 +54,6 @@ function c_load_dylib() {
 }
 
 function c_add_dynbook(book: Runtime.Book) {
-  //export type Page = {
-    //match: Array<number>,
-    //rules: Array<{
-      //test: Array<number>, 
-      //clrs: Array<number>,
-      //cols: Array<Lnk>,
-      //root: Lnk,
-      //body: Array<Lnk>,
-    //}>
-  //}
-  
   function prepare_numbers(numbers: Array<number>): Uint8Array {
     var data = new BigUint64Array(numbers.length);
     for (var i = 0; i < numbers.length; ++i) {
@@ -80,13 +66,6 @@ function c_add_dynbook(book: Runtime.Book) {
     var data = new BigUint64Array(lnks.length);
     for (var i = 0; i < lnks.length; ++i) {
       data[i] = lnks[i];
-      //var lnk = lnks[i];
-      //var num = 0n;
-      //var num = num | BigInt(Runtime.get_tag(lnk));
-      //var num = num | BigInt(Runtime.get_ext(lnk));
-      //var num = num | BigInt(Runtime.get_val(lnk));
-      //var num = num | (Runtime.is_cal(lnk) ? 0x8000000000000000n : 0n);
-      //data[i] = num;
     }
     return new Uint8Array(data.buffer);
   }
