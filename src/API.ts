@@ -9,8 +9,8 @@ import * as Readback from "./Compile/Readback.ts"
 
 type Mode = "DYNAMIC" | "STATIC";
 
-const MODE : Mode = "DYNAMIC";
-//const MODE : Mode = "STATIC";
+//const MODE : Mode = "DYNAMIC";
+const MODE : Mode = "STATIC";
 
 async function build_runtime(file: Lambolt.File, target: string, mode: Mode) {
   var source_path = new URL("./Runtime/Runtime."+target, import.meta.url);
@@ -32,9 +32,10 @@ function c_load_dylib() {
   if (c_dylib === null) {
     var path = new URL("./../bin/Runtime.so", import.meta.url);
     c_dylib = Deno.dlopen(path, {
-      "ffi_normal": {parameters: ["buffer","u32", "u32"], result: "u32"},
       "ffi_dynbook_add_page": {parameters: ["u64", "buffer"], result: "void"},
-      "ffi_get_gas": {parameters: [], result: "u32"},
+      "ffi_normal": {parameters: ["buffer","u32", "u32"], result: "void"},
+      "ffi_get_cost": {parameters: [], result: "u32"},
+      "ffi_get_size": {parameters: [], result: "u32"},
     });
   }
   return c_dylib;
@@ -49,8 +50,10 @@ function c_add_dynbook(book: Runtime.Book) {
 
 function c_normal(mem: Runtime.Mem, host: number): number {
   var dylib = c_load_dylib();
-  mem.size = dylib.symbols.ffi_normal(new Uint8Array(mem.data.buffer), mem.size, Number(host)) as number;
-  return dylib.symbols.ffi_get_gas() as number;
+  dylib.symbols.ffi_normal(new Uint8Array(mem.data.buffer), mem.size, Number(host));
+  mem.size = dylib.symbols.ffi_get_size() as number;
+  var cost = dylib.symbols.ffi_get_cost() as number;
+  return cost;
 }
 
 export async function run(code: string, opts: any) {

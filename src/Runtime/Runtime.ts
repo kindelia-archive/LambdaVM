@@ -129,7 +129,7 @@ export function array_pop(arr: Arr) : bigint | null {
 // Memory
 // ------
 
-export var GAS : number = 0;
+export var COST : number = 0;
 
 export function Var(pos: bigint) : Lnk {
   return (VAR * TAG) | pos;
@@ -215,8 +215,8 @@ export function ask_lnk(mem: Mem, loc: bigint) : Lnk {
   return array_read(mem, loc);
 }
 
-export function ask_gas() : number {
-  return GAS;
+export function ask_cost() : number {
+  return COST;
 }
 
 export function link(mem: Mem, loc: bigint, lnk: Lnk) : Lnk {

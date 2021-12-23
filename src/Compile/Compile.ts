@@ -149,7 +149,7 @@ export function compile_group_step_1(
       text += line(tab+1, VAR(target)+" LNK_"+i+" = ask_arg(mem, term, "+i+");");
       if (reduce_at[i]) {
         text += line(tab+1, "if (get_tag(LNK_"+i+") == PAR) {");
-        text += line(tab+1, "  cal_par("+TID(target)+"mem, host, term, LNK_"+i+", "+i+");");
+        text += line(tab+1, "  cal_par(mem, host, term, LNK_"+i+", "+i+");");
         text += line(tab+1, "}");
       }
     }
@@ -392,14 +392,7 @@ function U64(target: string, num: number | bigint): string {
 function GAS(target: string) {
   switch (target) {
     case "ts": return "++GAS";
-    case "c": return "inc_gas(tid)";
-  }
-}
-
-function TID(target: string) {
-  switch (target) {
-    case "ts": return "";
-    case "c": return "tid, ";
+    case "c": return "inc_cost(mem)";
   }
 }
 
