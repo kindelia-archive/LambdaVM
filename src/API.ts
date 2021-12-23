@@ -9,8 +9,8 @@ import * as Readback from "./Compile/Readback.ts"
 
 type Mode = "DYNAMIC" | "STATIC";
 
-//const MODE : Mode = "DYNAMIC";
-const MODE : Mode = "STATIC";
+const MODE : Mode = "DYNAMIC";
+//const MODE : Mode = "STATIC";
 
 async function build_runtime(file: Lambolt.File, target: string, mode: Mode) {
   var source_path = new URL("./Runtime/Runtime."+target, import.meta.url);

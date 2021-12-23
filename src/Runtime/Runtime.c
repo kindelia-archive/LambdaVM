@@ -632,6 +632,47 @@ Lnk cal_ctrs(
   return done;
 }
 
+u64 reduce_page(u64 tid, Mem* mem, u64 host, Lnk term, Page* page) {
+  //printf("- entering page...\n");
+  u64 args_data[page->match.size];
+  for (u64 arg_index = 0; arg_index < page->match.size; ++arg_index) {
+    //printf("- strict arg %llu\n", arg_index);
+    args_data[arg_index] = ask_arg(mem, term, arg_index);
+    if (get_tag(args_data[arg_index]) == PAR) {
+      cal_par(tid, mem, host, term, args_data[arg_index], arg_index);
+      break;
+    }
+  }
+  //printf("- page has: %llu rules\n", page->count);
+  u64 matched = 0;
+  for (u64 rule_index = 0; rule_index < page->count; ++rule_index) {
+    //printf("- trying to match rule %llu\n", rule_index);
+    Rule rule = page->rules[rule_index];
+    matched = 1;
+    for (u64 arg_index = 0; arg_index < rule.test.size; ++arg_index) {
+      u64 value = rule.test.data[arg_index];
+      if (get_tag(value) == CTR && !(get_tag(args_data[arg_index]) == CTR && get_ext(args_data[arg_index]) == get_ext(value))) {
+        //printf("- no match ctr %llu | %llu %llu\n", arg_index, get_ext(args_data[arg_index]), value);
+        matched = 0;
+        break;
+      }
+      if (get_tag(value) == U32 && !(get_tag(args_data[arg_index]) == U32 && get_val(args_data[arg_index]) == get_val(value))) {
+        //printf("- no match num %llu\n", arg_index);
+        matched = 0;
+        break;
+      }
+    }
+    if (matched) {
+      Arr args = (Arr){page->match.size, args_data};
+      //printf("- cal_ctrs\n");
+      cal_ctrs(tid, mem, host, rule.clrs, rule.cols, rule.root, rule.body, term, args);
+      break;
+    }
+  }
+  return matched;
+}
+
+
 Lnk reduce(u64 tid, Mem* mem, u64 root) {
   u32* stack = workers[tid].stack;
 
@@ -789,44 +830,7 @@ Lnk reduce(u64 tid, Mem* mem, u64 root) {
           //printf("- on term: "); debug_print_lnk(term); printf("\n");
           //printf("- BOOK[%llu].valid %llu\n", fun, BOOK[fun].valid);
           if (page) {
-            //printf("- entering page...\n");
-            u64 args_data[page->match.size];
-            for (u64 arg_index = 0; arg_index < page->match.size; ++arg_index) {
-              //printf("- strict arg %llu\n", arg_index);
-              args_data[arg_index] = ask_arg(mem, term, arg_index);
-              if (get_tag(args_data[arg_index]) == PAR) {
-                cal_par(tid, mem, host, term, args_data[arg_index], arg_index);
-                break;
-              }
-            }
-            //printf("- page has: %llu rules\n", page->count);
-            u64 matched = 0;
-            for (u64 rule_index = 0; rule_index < page->count; ++rule_index) {
-              //printf("- trying to match rule %llu\n", rule_index);
-              Rule rule = page->rules[rule_index];
-              matched = 1;
-              for (u64 arg_index = 0; arg_index < rule.test.size; ++arg_index) {
-                u64 value = rule.test.data[arg_index];
-                if (get_tag(value) == CTR && !(get_tag(args_data[arg_index]) == CTR && get_ext(args_data[arg_index]) == get_ext(value))) {
-                  //printf("- no match ctr %llu | %llu %llu\n", arg_index, get_ext(args_data[arg_index]), value);
-                  matched = 0;
-                  break;
-                }
-                if (get_tag(value) == U32 && !(get_tag(args_data[arg_index]) == U32 && get_val(args_data[arg_index]) == get_val(value))) {
-                  //printf("- no match num %llu\n", arg_index);
-                  matched = 0;
-                  break;
-                }
-              }
-              if (matched) {
-                Arr args = (Arr){page->match.size, args_data};
-                //printf("- cal_ctrs\n");
-                cal_ctrs(tid, mem, host, rule.clrs, rule.cols, rule.root, rule.body, term, args);
-                break;
-              }
-            }
-            if (matched) {
-              //printf("- continue\n");
+            if (reduce_page(tid, mem, host, term, page)) {
               init = 1;
               continue;
             }
