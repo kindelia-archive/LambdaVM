@@ -997,36 +997,6 @@ void ffi_dynbook_add_page(u64 page_index, u64* page_data) {
       page->rules[r].cols.data[n] = page_data[i++];
     }
   }
-
-  //printf("done\n");
-  //printf("Page index: %llu\n", page_index);
-  //printf("Rule index: %llu\n", rule_index);
-  //printf("Test data:");
-  //for (u64 i = 0; i < test_size; ++i) {
-    //printf(" %llu", test_data[i]);
-  //}
-  //printf("\n");
-  //printf("Test size: %llu\n", test_size);
-  //printf("Clrs data:");
-  //for (u64 i = 0; i < clrs_size; ++i) {
-    //printf(" %llu", clrs_data[i]);
-  //}
-  //printf("\n");
-  //printf("Clrs size: %llu\n", clrs_size);
-  //printf("Cols data:");
-  //for (u64 i = 0; i < cols_size; ++i) {
-    //printf(" %llu", cols_data[i]);
-  //}
-  //printf("\n");
-  //printf("Cols size: %llu\n", cols_size);
-  //printf("Root     : %llu\n", root[0]);
-  //printf("Body data:");
-  //for (u64 i = 0; i < body_size; ++i) {
-    //printf(" %llu", body_data[i]);
-  //}
-  //printf("\n");
-  //printf("Body size: %llu\n", body_size);
-  //printf("\n");
 }
 
 u32 ffi_normal(u8* mem_data, u32 mem_size, u32 host) {
@@ -1085,7 +1055,6 @@ u32 ffi_get_gas() {
   }
   return total;
 }
-
 
 // Main
 // ----
