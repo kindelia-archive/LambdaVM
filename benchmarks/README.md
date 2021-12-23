@@ -1,12 +1,12 @@
 Benchmarks
 ==========
 
-These benchmarks compare JavaScript V8, Haskell GHC and Lambolt LamRT. Right
-now, we just have some micro-benchmarks, tested on my Macbook Pro M1. We will
-soon update this repository to include real-world examples, and a proper
-benchmark suite that 1. performs multiple runs, 2. creates a chart for varying
-input sizes. Note that this is a very early, non-optimized, version of LamRT,
-and several improvements are on the workings.
+These benchmarks compare JavaScript V8, Haskell GHC and Lambolt λVM. Right now,
+we just have some micro-benchmarks, tested on my Macbook Pro M1. We will soon
+update this repository to include real-world examples, and a proper benchmark
+suite that 1. performs multiple runs, 2. creates a chart for varying input
+sizes. Note that this is a very early, non-optimized, version of λVM, and
+several improvements are on the workings.
 
 ### Running
 

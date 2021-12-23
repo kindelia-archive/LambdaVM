@@ -1,4 +1,4 @@
-# LamRT
+# λVM
 
 A next-gen, massively parallel, beta-optimal functional runtime.
 
@@ -9,13 +9,13 @@ A next-gen, massively parallel, beta-optimal functional runtime.
 2. Clone this repository:
 
     ```
-    git clone https://github.com/kindelia/lamrt
+    git clone https://github.com/kindelia/lambdavm
     ```
 
-3. Install LamRT:
+3. Install λVM:
 
     ```bash
-    deno --unstable install -n lam --allow-all ./lamrt/src/main.ts
+    deno --unstable install -n lam --allow-all ./lambdavm/src/main.ts
     ```
 
 4. Create a [Lambolt](https://github.com/kindelia/lambolt) file:

@@ -119,4 +119,4 @@ Then we'd have the following, direct reduction:
 
 **EDIT: solved.**
 
-https://github.com/Kindelia/LamRT/commit/409617582631431af12cd2b5d7281a3a0a0c5d73
+https://github.com/Kindelia/lambdavm/commit/409617582631431af12cd2b5d7281a3a0a0c5d73
