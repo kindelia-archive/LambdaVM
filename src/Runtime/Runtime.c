@@ -1,7 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <pthread.h>
-#include <string.h>
 
 // Types
 // -----
@@ -9,6 +8,17 @@
 typedef unsigned char u8;
 typedef unsigned int u32;
 typedef unsigned long long int u64;
+
+// Consts
+// ------
+
+const u64 MAX_WORKERS = 8;
+const u64 MAX_DYNFUNS = 65536;
+
+// Terms
+// -----
+
+typedef u64 Lnk;
 
 const u64 VAL = 1;
 const u64 EXT = 0x100000000; 
@@ -55,7 +65,8 @@ const u64 NEQ = 0xF;
 //GENERATED_USE_DYNAMIC_FLAG//
 //GENERATED_USE_STATIC_FLAG//
 
-typedef u64 Lnk;
+// Threads
+// -------
 
 typedef struct {
   u64 size;
@@ -68,6 +79,15 @@ typedef struct {
   u32* stack;
   u64  cost;
 } Mem;
+
+typedef struct {
+  pthread_t thread;
+  Mem* mem;
+  u64 host;
+} Worker;
+
+// Dynbook
+// -------
 
 typedef struct {
   Arr test;
@@ -85,21 +105,11 @@ typedef struct {
 
 typedef Page** Book;
 
-typedef struct {
-  pthread_t thread;
-  Mem* mem;
-  u64 host;
-} Worker;
-
-const u64 BOOK_SIZE = 65536;
-Page* BOOK[BOOK_SIZE];
-
-// Workers
+// Globals
 // -------
 
-const u64 MAX_WORKERS = 8;
-u64 CAN_SPAWN_WORKERS = 1;
 Worker workers[MAX_WORKERS];
+Page* book[MAX_DYNFUNS];
 
 // Array
 // -----
@@ -126,10 +136,6 @@ u64 array_pop(Arr* arr) {
 
 // Memory
 // ------
-
-void inc_cost(Mem* mem) {
-  mem->cost++;
-}
 
 Lnk Var(u64 pos) {
   return (VAR * TAG) | pos;
@@ -330,8 +336,12 @@ void collect(Mem* mem, Lnk term) {
   }
 }
 
-// Reduction
-// ---------
+// Terms
+// -----
+
+void inc_cost(Mem* mem) {
+  mem->cost++;
+}
 
 void subst(Mem* mem, Lnk lnk, Lnk val) {
   if (get_tag(lnk) != ERA) {
@@ -703,7 +713,7 @@ Lnk reduce(Mem* mem, u64 root) {
           // -------------
 
           #ifdef USE_DYNAMIC
-          Page* page = BOOK[fun];
+          Page* page = book[fun];
           if (page) {
             stack[size++] = host;
             for (u64 arg_index = 0; arg_index < page->match.size; ++arg_index) {
@@ -799,7 +809,7 @@ Lnk reduce(Mem* mem, u64 root) {
           #endif
 
           #ifdef USE_DYNAMIC
-          Page* page = BOOK[fun];
+          Page* page = book[fun];
           //printf("- on term: "); debug_print_lnk(term); printf("\n");
           //printf("- BOOK[%llu].valid %llu\n", fun, BOOK[fun].valid);
           if (page) {
@@ -842,6 +852,7 @@ u8 get_bit(u64* bits, u8 bit) {
 void normal_fork(u64 tid, u64 host);
 void normal_join(u64 tid);
 
+u64 CAN_SPAWN_THREADS = 1;
 Lnk normal_cont(Mem* mem, u64 host, u64* seen) {
   Lnk term = ask_lnk(mem, host);
   //printf("normal "); debug_print_lnk(term); printf("\n");
@@ -875,8 +886,8 @@ Lnk normal_cont(Mem* mem, u64 host, u64* seen) {
       }
       case CTR: case FUN: {
         u64 arity = (u64)get_ari(term);
-        if (CAN_SPAWN_WORKERS && arity > 1 && arity <= MAX_WORKERS) {
-          CAN_SPAWN_WORKERS = 0;
+        if (CAN_SPAWN_THREADS && arity > 1 && arity <= MAX_WORKERS) {
+          CAN_SPAWN_THREADS = 0;
           for (u64 t = 0; t < arity; ++t) {
             normal_fork(t, get_loc(term,t));
           }
@@ -928,7 +939,7 @@ void normal_join(u64 tid) {
 void ffi_dynbook_add_page(u64 page_index, u64* page_data) {
   //printf("dynbook_add_page: %llu %llu %llu %llu ...\n", page_data[0], page_data[1], page_data[2], page_data[3]);
 
-  Page* page = BOOK[page_index] = malloc(sizeof(Page));
+  Page* page = book[page_index] = malloc(sizeof(Page));
 
   u64 i = 0;
   page->match.size = page_data[i++];
@@ -1012,8 +1023,8 @@ void ffi_normal(u8* mem_data, u32 mem_size, u32 host) {
   normal_join(0);
   
   // Clears mallocs
-  for (u64 i = 0; i < BOOK_SIZE; ++i) {
-    Page* page = BOOK[i];
+  for (u64 i = 0; i < MAX_DYNFUNS; ++i) {
+    Page* page = book[i];
     if (page) {
       free(page->match.data);
       for (u64 j = 0; j < page->count; ++j) {
