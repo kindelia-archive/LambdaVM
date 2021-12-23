@@ -32,107 +32,25 @@ function c_load_dylib() {
   if (c_dylib === null) {
     var path = new URL("./../bin/Runtime.so", import.meta.url);
     c_dylib = Deno.dlopen(path, {
-      "normal_ffi": {
-        parameters: ["buffer","u32", "u32"],
-        result: "u32",
-      },
-      "dynbook_page_init_ffi": {
-        parameters: ["u64", "buffer", "u64", "u64"],
-        result: "void",
-      },
-      "dynbook_page_add_rule_ffi": {
-        parameters: ["u64", "u64", "buffer", "u64", "buffer", "u64", "buffer", "u64", "buffer", "buffer", "u64"],
-        result: "void",
-      },
-      "get_gas": {
-        parameters: [],
-        result: "u32"
-      },
+      "ffi_normal": {parameters: ["buffer","u32", "u32"], result: "u32"},
+      "ffi_dynbook_add_page": {parameters: ["u64", "buffer"], result: "void"},
+      "ffi_get_gas": {parameters: [], result: "u32"},
     });
   }
   return c_dylib;
 }
 
 function c_add_dynbook(book: Runtime.Book) {
-  function prepare_numbers(numbers: Array<number>): Uint8Array {
-    var data = new BigUint64Array(numbers.length);
-    for (var i = 0; i < numbers.length; ++i) {
-      data[i] = BigInt(numbers[i]);
-    }
-    return new Uint8Array(data.buffer);
-  }
-
-  function prepare_lnks(lnks: Array<Runtime.Lnk>): Uint8Array {
-    var data = new BigUint64Array(lnks.length);
-    for (var i = 0; i < lnks.length; ++i) {
-      data[i] = lnks[i];
-    }
-    return new Uint8Array(data.buffer);
-  }
-
   var dylib = c_load_dylib();
-
-  // For each page
   for (var key in book) {
-    var page = book[key];
-
-    // Adds this page
-    var page_index = Number(key);
-    var match_data = prepare_numbers(page.match);
-    var match_size = page.match.length;
-    var count      = page.rules.length;
-    dylib.symbols.dynbook_page_init_ffi(
-      page_index,
-      match_data,
-      match_size,
-      count,
-    );
-
-    // Adds this page's rules
-    for (var rule_index = 0; rule_index < page.rules.length; ++rule_index) {
-      var rule      = page.rules[rule_index];
-      var test_data = prepare_lnks(rule.test);
-      var test_size = rule.test.length;
-      var clrs_data = prepare_numbers(rule.clrs);
-      var clrs_size = rule.clrs.length;
-      var cols_data = prepare_lnks(rule.cols);
-      var cols_size = rule.cols.length;
-      var root      = prepare_lnks([rule.root]);
-      var body_data = prepare_lnks(rule.body);
-      var body_size = rule.body.length;
-      //console.log("page_index:", (page_index));
-      //console.log("rule_index:", (rule_index));
-      //console.log("test_data:", (new BigUint64Array(test_data.buffer)));
-      //console.log("test_size:", (test_size));
-      //console.log("clrs_data:", (new BigUint64Array(clrs_data.buffer)));
-      //console.log("clrs_size:", (clrs_size));
-      //console.log("cols_data:", (new BigUint64Array(cols_data.buffer)));
-      //console.log("cols_size:", (cols_size));
-      //console.log("root     :", (new BigUint64Array(root.buffer)));
-      //console.log("body_data:", (new BigUint64Array(body_data.buffer)));
-      //console.log("body_size:", (body_size));
-      //console.log("");
-      dylib.symbols.dynbook_page_add_rule_ffi(
-        page_index,
-        rule_index,
-        test_data,
-        test_size,
-        clrs_data,
-        clrs_size,
-        cols_data,
-        cols_size,
-        root,
-        body_data,
-        body_size,
-      );
-    }
+    dylib.symbols.ffi_dynbook_add_page(Number(key), Dynbook.page_serialize(book[key]));
   }
 }
 
 function c_normal(mem: Runtime.Mem, host: number): number {
   var dylib = c_load_dylib();
-  mem.size = dylib.symbols.normal_ffi(new Uint8Array(mem.data.buffer), mem.size, Number(host)) as number;
-  return dylib.symbols.get_gas() as number;
+  mem.size = dylib.symbols.ffi_normal(new Uint8Array(mem.data.buffer), mem.size, Number(host)) as number;
+  return dylib.symbols.ffi_get_gas() as number;
 }
 
 export async function run(code: string, opts: any) {
@@ -141,7 +59,6 @@ export async function run(code: string, opts: any) {
   
   var file = Lambolt.read_file(code);
   var book = Dynbook.compile(file);
-  //console.log(Lambolt.show_file(file));
 
   var main = file[file.length - 1];
   if (!main

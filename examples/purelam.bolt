@@ -1,11 +1,12 @@
 (Not (True)) = (False)
 (Not (False)) = (True)
 
-(Main) =
-  (Not (Not (Not (Not (Not (True))))))
-
 //(Main) =
-  ////(λf λx (f (f x)) λf λx (f (f x)))
+  //λx x
+
+(Main) =
+  (Not (Not (Not (True))))
+  //(λf λx (f (f x)) λf λx (f (f x)))
   //let y = λf ((λr (f (r r))) (λr (f (r r))))
   //let s = λn λz λs (s n)
   //let z = λz λs z

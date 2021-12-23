@@ -70,14 +70,13 @@ typedef struct {
 
 typedef struct {
   Arr test;
-  Arr clrs;
-  Arr cols;
   Lnk root;
   Arr body;
+  Arr clrs;
+  Arr cols;
 } Rule;
 
 typedef struct {
-  u64 valid;
   Arr match;
   u64 count;
   Rule* rules;
@@ -94,7 +93,7 @@ typedef struct {
 } Worker;
 
 const u64 BOOK_SIZE = 65536;
-Page BOOK[BOOK_SIZE];
+Page* BOOK[BOOK_SIZE];
 
 // Workers
 // -------
@@ -151,14 +150,6 @@ u64 mem_pop(Mem* mem) {
 
 // Memory
 // ------
-
-u32 get_gas() {
-  u32 total = 0;
-  for (u64 t = 0; t < MAX_WORKERS; ++t) {
-    total += workers[t].gas;
-  }
-  return total;
-}
 
 void inc_gas(u64 tid) {
   workers[tid].gas++;
@@ -652,7 +643,7 @@ Lnk reduce(u64 tid, Mem* mem, u64 root) {
 
     u64 term = ask_lnk(mem, host);
 
-    //printf("reducing host=%d size=%llu cont=%llu ", host, size, cont); debug_print_lnk(term); printf("\n");
+    //printf("reducing: host=%d size=%llu init=%llu ", host, size, init); debug_print_lnk(term); printf("\n");
     //for (u64 i = 0; i < size; ++i) {
       //printf("- %llu ", stack[i]); debug_print_lnk(ask_lnk(mem, stack[i]>>1)); printf("\n");
     //}
@@ -678,6 +669,7 @@ Lnk reduce(u64 tid, Mem* mem, u64 root) {
           continue;
         }
         case FUN: {
+          //printf("?\n");
           u64 fun = get_ext(term);
           u64 ari = get_ari(term);
           
@@ -697,11 +689,11 @@ Lnk reduce(u64 tid, Mem* mem, u64 root) {
           // -------------
 
           #ifdef USE_DYNAMIC
-          Page page = BOOK[fun];
-          if (page.valid == 1) {
+          Page* page = BOOK[fun];
+          if (page) {
             stack[size++] = host;
-            for (u64 arg_index = 0; arg_index < page.match.size; ++arg_index) {
-              if (page.match.data[arg_index] > 0) {
+            for (u64 arg_index = 0; arg_index < page->match.size; ++arg_index) {
+              if (page->match.data[arg_index] > 0) {
                 //printf("- ue %llu\n", arg_index);
                 stack[size++] = get_loc(term, arg_index) | 0x80000000;
               }
@@ -793,13 +785,13 @@ Lnk reduce(u64 tid, Mem* mem, u64 root) {
           #endif
 
           #ifdef USE_DYNAMIC
-          Page page = BOOK[fun];
+          Page* page = BOOK[fun];
           //printf("- on term: "); debug_print_lnk(term); printf("\n");
           //printf("- BOOK[%llu].valid %llu\n", fun, BOOK[fun].valid);
-          if (page.valid == 1) {
+          if (page) {
             //printf("- entering page...\n");
-            u64 args_data[page.match.size];
-            for (u64 arg_index = 0; arg_index < page.match.size; ++arg_index) {
+            u64 args_data[page->match.size];
+            for (u64 arg_index = 0; arg_index < page->match.size; ++arg_index) {
               //printf("- strict arg %llu\n", arg_index);
               args_data[arg_index] = ask_arg(mem, term, arg_index);
               if (get_tag(args_data[arg_index]) == PAR) {
@@ -807,11 +799,11 @@ Lnk reduce(u64 tid, Mem* mem, u64 root) {
                 break;
               }
             }
-            //printf("- page has: %llu rules\n", page.count);
+            //printf("- page has: %llu rules\n", page->count);
             u64 matched = 0;
-            for (u64 rule_index = 0; rule_index < page.count; ++rule_index) {
+            for (u64 rule_index = 0; rule_index < page->count; ++rule_index) {
               //printf("- trying to match rule %llu\n", rule_index);
-              Rule rule = page.rules[rule_index];
+              Rule rule = page->rules[rule_index];
               matched = 1;
               for (u64 arg_index = 0; arg_index < rule.test.size; ++arg_index) {
                 u64 value = rule.test.data[arg_index];
@@ -827,7 +819,7 @@ Lnk reduce(u64 tid, Mem* mem, u64 root) {
                 }
               }
               if (matched) {
-                Arr args = (Arr){page.match.size, args_data};
+                Arr args = (Arr){page->match.size, args_data};
                 //printf("- cal_ctrs\n");
                 cal_ctrs(tid, mem, host, rule.clrs, rule.cols, rule.root, rule.body, term, args);
                 break;
@@ -953,83 +945,60 @@ void normal_join(u64 tid) {
   pthread_join(workers[tid].thread, NULL);
 }
 
-//typedef struct {
-  //Arr test;
-  //Arr clrs;
-  //Arr cols;
-  //Lnk root;
-  //Arr body;
-//} Rule;
+// FFI
+// ---
 
-//typedef struct {
-  //Arr match;
-  //u64 count;
-  //Rule* rules;
-//} Page;
+void ffi_dynbook_add_page(u64 page_index, u64* page_data) {
+  //printf("dynbook_add_page: %llu %llu %llu %llu ...\n", page_data[0], page_data[1], page_data[2], page_data[3]);
 
-//typedef struct {
-  //u64 size;
-  //u64* data;
-//} Arr;
+  Page* page = BOOK[page_index] = malloc(sizeof(Page));
 
-//void add_dynbook_ffi(
-  //u64* match_data,
-  //u64  match_size,
-  //u64* test_data,
-  //u64  test_size,
-  //u64* clrs_data,
-  //u64  clrs_size,
-  //u64  root,
-  //u64* lnk,
-//) {
-  
-//}
+  u64 i = 0;
+  page->match.size = page_data[i++];
+  //printf("match.size: %llu\n", page->match.size);
+  page->match.data = (u64*)malloc(page->match.size * sizeof(u64));
+  for (u64 n = 0; n < page->match.size; ++n) {
+    page->match.data[n] = page_data[i++];
+  }
 
-void dynbook_page_init_ffi(
-  u64  page_index,
-  u64* match_data,
-  u64  match_size,
-  u64  count
-) {
-  BOOK[page_index].valid      = 1;
-  BOOK[page_index].match.data = (u64*)malloc(match_size * sizeof(u64));
-  memcpy(BOOK[page_index].match.data, match_data, match_size * sizeof(u64));
-  BOOK[page_index].match.size = match_size;
-  BOOK[page_index].count      = count;
-  BOOK[page_index].rules      = (Rule*)malloc(count * sizeof(Rule));
-}
+  page->count = page_data[i++];
+  page->rules = (Rule*)malloc(page->count * sizeof(Rule));
+  //printf("rule count: %llu\n", page->count);
 
-void dynbook_page_add_rule_ffi(
-  u64  page_index,
-  u64  rule_index,
-  u64* test_data,
-  u64  test_size,
-  u64* clrs_data,
-  u64  clrs_size,
-  u64* cols_data,
-  u64  cols_size,
-  u64* root,
-  u64* body_data,
-  u64  body_size 
-) {
-  BOOK[page_index].rules[rule_index].test.data = (u64*)malloc(test_size * sizeof(u64));
-  BOOK[page_index].rules[rule_index].test.size = test_size;
-  memcpy(BOOK[page_index].rules[rule_index].test.data, test_data, test_size * sizeof(u64));
+  for (u64 r = 0; r < page->count; ++r) {
+    //printf("on rule %llu\n", r);
+    page->rules[r].test.size = page_data[i++];
+    //printf("- test.size: %llu\n", page->rules[r].test.size);
+    page->rules[r].test.data = (u64*)malloc(page->rules[r].test.size * sizeof(u64));
+    for (u64 n = 0; n < page->rules[r].test.size; ++n) {
+      page->rules[r].test.data[n] = page_data[i++];
+    }
 
-  BOOK[page_index].rules[rule_index].clrs.data = (u64*)malloc(clrs_size * sizeof(u64));
-  BOOK[page_index].rules[rule_index].clrs.size = clrs_size;
-  memcpy(BOOK[page_index].rules[rule_index].clrs.data, clrs_data, clrs_size * sizeof(u64));
+    page->rules[r].root = page_data[i++];
+    //printf("- root: %llu\n", page->rules[r].root);
+    page->rules[r].body.size = page_data[i++];
+    //printf("- body.size: %llu\n", page->rules[r].body.size);
+    page->rules[r].body.data = (u64*)malloc(page->rules[r].body.size * sizeof(u64));
+    for (u64 n = 0; n < page->rules[r].body.size; ++n) {
+      page->rules[r].body.data[n] = page_data[i++];
+    }
 
-  BOOK[page_index].rules[rule_index].cols.data = (u64*)malloc(cols_size * sizeof(u64));
-  BOOK[page_index].rules[rule_index].cols.size = cols_size;
-  memcpy(BOOK[page_index].rules[rule_index].cols.data, cols_data, cols_size * sizeof(u64));
+    page->rules[r].clrs.size = page_data[i++];
+    //printf("- clrs.size: %llu\n", page->rules[r].clrs.size);
+    page->rules[r].clrs.data = (u64*)malloc(page->rules[r].clrs.size * sizeof(u64));
+    for (u64 n = 0; n < page->rules[r].clrs.size; ++n) {
+      page->rules[r].clrs.data[n] = page_data[i++];
+    }
 
-  BOOK[page_index].rules[rule_index].root      = root[0];
+    page->rules[r].cols.size = page_data[i++];
+    //printf("- cols.size: %llu\n", page->rules[r].cols.size);
+    page->rules[r].cols.data = (u64*)malloc(page->rules[r].cols.size * sizeof(u64));
+    for (u64 n = 0; n < page->rules[r].cols.size; ++n) {
+      page->rules[r].cols.data[n] = page_data[i++];
+    }
+  }
 
-  BOOK[page_index].rules[rule_index].body.data = (u64*)malloc(body_size * sizeof(u64));
-  BOOK[page_index].rules[rule_index].body.size = body_size;
-  memcpy(BOOK[page_index].rules[rule_index].body.data, body_data, body_size * sizeof(u64));
-
+  //printf("done\n");
   //printf("Page index: %llu\n", page_index);
   //printf("Rule index: %llu\n", rule_index);
   //printf("Test data:");
@@ -1058,10 +1027,9 @@ void dynbook_page_add_rule_ffi(
   //printf("\n");
   //printf("Body size: %llu\n", body_size);
   //printf("\n");
-
 }
 
-u32 normal_ffi(u8* mem_data, u32 mem_size, u32 host) {
+u32 ffi_normal(u8* mem_data, u32 mem_size, u32 host) {
 
   // Init thread objects
   Mem mem;
@@ -1078,11 +1046,6 @@ u32 normal_ffi(u8* mem_data, u32 mem_size, u32 host) {
     workers[t].stack = malloc(64 * 1024 * 1024 * sizeof(u64)); // 64 MB
   }
 
-  // Inits dynbook
-  //for (u64 i = 0; i < BOOK_SIZE; ++i) {
-    //BOOK[i].valid = 0;
-  //}
-
   //printf("got: %llu %llu %llu\n", get_tag(mem.data[0])/TAG, get_ext(mem.data[0])/EXT, get_val(mem.data[0]));
 
   // Spawns the root worker
@@ -1092,15 +1055,17 @@ u32 normal_ffi(u8* mem_data, u32 mem_size, u32 host) {
 
   // Clears dynbook
   for (u64 i = 0; i < BOOK_SIZE; ++i) {
-    if (BOOK[i].valid) {
-      free(BOOK[i].match.data);
-      for (u64 j = 0; j < BOOK[i].count; ++j) {
-        free(BOOK[i].rules[j].test.data);
-        free(BOOK[i].rules[j].clrs.data);
-        free(BOOK[i].rules[j].cols.data);
-        free(BOOK[i].rules[j].body.data);
+    Page* page = BOOK[i];
+    if (page) {
+      free(page->match.data);
+      for (u64 j = 0; j < page->count; ++j) {
+        free(page->rules[j].test.data);
+        free(page->rules[j].clrs.data);
+        free(page->rules[j].cols.data);
+        free(page->rules[j].body.data);
       }
-      free(BOOK[i].rules);
+      free(page->rules);
+      free(page);
     }
   }
 
@@ -1112,6 +1077,18 @@ u32 normal_ffi(u8* mem_data, u32 mem_size, u32 host) {
   return mem.size;
 
 }
+
+u32 ffi_get_gas() {
+  u32 total = 0;
+  for (u64 t = 0; t < MAX_WORKERS; ++t) {
+    total += workers[t].gas;
+  }
+  return total;
+}
+
+
+// Main
+// ----
 
 // Uncomment to test without Deno FFI
 //int main() {

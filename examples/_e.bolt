@@ -1,5 +1,4 @@
-(Not (True)) = (False)
-(Not (False)) = (True)
+(Count 0) = 0
+(Count n) = (+ 1 (Count (- n 1)))
 
-//(Main) = ((λf λx (f (f x))) (λf λx (f (f x))))
-(Main) = (Not (Not (True)))
+(Main) = (Count 20000000)

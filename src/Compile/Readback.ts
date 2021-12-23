@@ -129,7 +129,7 @@ export function runtime_to_lambolt(MEM: C.Mem, input_term: C.Lnk | null = null, 
         case C.U32: {
           return "" + C.get_val(term);
         }
-        case C.CTR: {
+        case C.CTR: case C.FUN: {
           let func = C.get_ext(term);
           var arit = C.get_ari(term);
           let args = [];

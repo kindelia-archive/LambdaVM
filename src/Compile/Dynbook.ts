@@ -281,3 +281,36 @@ export function compile_group(
   var uses : {[name: string]: number} = {};
   return compile_group(name, arity, rules.map(sanitize));
 }
+
+export function page_to_u64_array(page: R.Page): BigUint64Array {
+  let nums : Array<bigint> = [];
+  nums.push(BigInt(page.match.length));
+  for (let num of page.match) {
+    nums.push(BigInt(num));
+  }
+  nums.push(BigInt(page.rules.length));
+  for (let rule of page.rules) {
+    nums.push(BigInt(rule.test.length));
+    for (let num of rule.test) {
+      nums.push(num);
+    }
+    nums.push(rule.root);
+    nums.push(BigInt(rule.body.length));
+    for (let num of rule.body) {
+      nums.push(num);
+    }
+    nums.push(BigInt(rule.clrs.length));
+    for (let num of rule.clrs) {
+      nums.push(BigInt(num));
+    }
+    nums.push(BigInt(rule.cols.length));
+    for (let num of rule.cols) {
+      nums.push(num);
+    }
+  }
+  return new BigUint64Array(nums);
+}
+
+export function page_serialize(page: R.Page): Uint8Array {
+  return new Uint8Array(page_to_u64_array(page).buffer);
+}
