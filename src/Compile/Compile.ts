@@ -146,10 +146,10 @@ export function compile_group_step_1(
       text += line(tab+1, VAR(target) + " LOC_"+i+" = get_loc(term,"+i+");");
     }
     for (var i = 0; i < arity; ++i) {
-      text += line(tab+1, VAR(target)+" LNK_"+i+" = ask_arg(mem, term, "+i+");");
+      text += line(tab+1, VAR(target)+" LNK_"+i+" = ask_arg(term, "+i+");");
       if (reduce_at[i]) {
         text += line(tab+1, "if (get_tag(LNK_"+i+") == PAR) {");
-        text += line(tab+1, "  cal_par(mem, host, term, LNK_"+i+", "+i+");");
+        text += line(tab+1, "  cal_par(tid, host, term, LNK_"+i+", "+i+");");
         text += line(tab+1, "}");
       }
     }
@@ -158,7 +158,7 @@ export function compile_group_step_1(
     for (var {rule,uses} of rules) {
       if (rule.lhs.$ === "Ctr" && rule.lhs.args.length === arity) {
 
-        var clears = ["clear(mem, get_loc(term, 0), "+rule.lhs.args.length+")"];
+        var clears = ["clear(tid, get_loc(term, 0), "+rule.lhs.args.length+")"];
         var collects = [];
 
         // Checks if this rule matches and enters its branch. That is,
@@ -195,7 +195,7 @@ export function compile_group_step_1(
                 switch (field.$) {
                   case "Var": {
                     locs[field.name] = define("loc", "get_loc(LNK_"+i+", "+j+")", tab+2);
-                    args[field.name] = define("lnk", "ask_arg(mem, LNK_"+i+", "+j+")", tab+2);
+                    args[field.name] = define("lnk", "ask_arg(LNK_"+i+", "+j+")", tab+2);
                     if (!uses[field.name]) {
                       collects.push(args[field.name]);
                     }
@@ -206,7 +206,7 @@ export function compile_group_step_1(
                   }
                 }
               }
-              clears.push("clear(mem, get_loc(LNK_"+i+", 0), "+term.args.length+")");
+              clears.push("clear(tid, get_loc(LNK_"+i+", 0), "+term.args.length+")");
               break;
             }
             // If the argument is a variable, link its name to its loc and lnk. That is,
@@ -234,7 +234,7 @@ export function compile_group_step_1(
         // At this point, we've matched a rule and collected all the left-hand
         // side variables. Great! Now we just need to compile the right-hand.
         var done = compile_term(rule.rhs, tab+2, uses);
-        text += line(tab+2, "link(mem, host, " + done + ");"); 
+        text += line(tab+2, "link(host, " + done + ");"); 
 
         // Now we free the nodes used in this rule.
         for (var clear of clears) {
@@ -243,7 +243,7 @@ export function compile_group_step_1(
 
         // Now we collect the variables that went out of scope.
         for (var collect of collects) {
-          text += line(tab+2, "collect(mem, " + collect + ");");
+          text += line(tab+2, "collect(tid, " + collect + ");");
         }
 
         // And we're done! WP.
@@ -271,18 +271,18 @@ export function compile_group_step_1(
         var name = fresh("dup");
         var dupn = fresh("col");
         var dupk = dups++;
-        text += line(tab, VAR(target) + " " + name + " = alloc(mem, 3);");
+        text += line(tab, VAR(target) + " " + name + " = alloc(tid, 3);");
         text += line(tab, VAR(target) + " " + dupn + " = " + U64(target,dupk) + ";");
         args[term.nam0] = "Dp0("+dupn+", "+name+")";
         args[term.nam1] = "Dp1("+dupn+", "+name+")";
         if (!uses[term.nam0]) {
-          text += line(tab, "link(mem, " + name + "+"+U64(target,0)+", Era());");
+          text += line(tab, "link(" + name + "+"+U64(target,0)+", Era());");
         }
         if (!uses[term.nam1]) {
-          text += line(tab, "link(mem, " + name + "+"+U64(target,1)+", Era());");
+          text += line(tab, "link(" + name + "+"+U64(target,1)+", Era());");
         }
         var expr = compile_term(term.expr, tab, uses);
-        text += line(tab, "link(mem, "+name+"+"+U64(target,2)+", "+expr+");");
+        text += line(tab, "link("+name+"+"+U64(target,2)+", "+expr+");");
         var body = compile_term(term.body, tab, uses);
         return body;
       case "Let":
@@ -292,21 +292,21 @@ export function compile_group_step_1(
         return body;
       case "Lam":
         var name = fresh("lam");
-        text += line(tab, VAR(target) + " " + name + " = alloc(mem, 2);");
+        text += line(tab, VAR(target) + " " + name + " = alloc(tid, 2);");
         args[term.name] = "Var("+name+")";
         var body = compile_term(term.body, tab, uses);
         if (!uses[term.name]) {
-          text += line(tab, "link(mem, " + name+"+"+U64(target,0)+", Era());");
+          text += line(tab, "link(" + name+"+"+U64(target,0)+", Era());");
         }
-        text += line(tab, "link(mem, " + name+"+"+U64(target,1)+", " + body + ");");
+        text += line(tab, "link(" + name+"+"+U64(target,1)+", " + body + ");");
         return "Lam(" + name + ")";
       case "App":
         var name = fresh("app");
         var func = compile_term(term.func, tab, uses);
         var argm = compile_term(term.argm, tab, uses);
-        text += line(tab, VAR(target) + " " + name + " = alloc(mem, 2);");
-        text += line(tab, "link(mem, " + name+"+"+U64(target,0)+", " + func + ");");
-        text += line(tab, "link(mem, " + name+"+"+U64(target,1)+", " + argm + ");");
+        text += line(tab, VAR(target) + " " + name + " = alloc(tid, 2);");
+        text += line(tab, "link(" + name+"+"+U64(target,0)+", " + func + ");");
+        text += line(tab, "link(" + name+"+"+U64(target,1)+", " + argm + ");");
         return "App(" + name + ")";
       case "Ctr":
         var ctr_args : Array<string> = [];
@@ -314,18 +314,18 @@ export function compile_group_step_1(
           ctr_args.push(compile_term(term.args[i], tab, uses));
         }
         var name = fresh("ctr");
-        text += line(tab, VAR(target) + " " + name + " = alloc(mem, " + ctr_args.length + ");");
+        text += line(tab, VAR(target) + " " + name + " = alloc(tid, " + ctr_args.length + ");");
         for (var i = 0; i < ctr_args.length; ++i) {
-          text += line(tab, "link(mem, " + name+"+"+U64(target,i) + ", " + ctr_args[i] + ");");
+          text += line(tab, "link(" + name+"+"+U64(target,i) + ", " + ctr_args[i] + ");");
         }
         return (is_call[term.name] ? "Cal" : "Ctr") + "(" + ctr_args.length + ", " + (compile_constructor_name(term.name)||0) + ", " + name + ")";
       case "Op2":
         var name = fresh("op2");
         var val0 = compile_term(term.val0, tab, uses);
         var val1 = compile_term(term.val1, tab, uses);
-        text += line(tab, VAR(target) + " " + name + " = alloc(mem, 2);");
-        text += line(tab, "link(mem, " + name+"+"+U64(target,0)+", " + val0 + ");");
-        text += line(tab, "link(mem, " + name+"+"+U64(target,1)+", " + val1 + ");");
+        text += line(tab, VAR(target) + " " + name + " = alloc(tid, 2);");
+        text += line(tab, "link(" + name+"+"+U64(target,0)+", " + val0 + ");");
+        text += line(tab, "link(" + name+"+"+U64(target,1)+", " + val1 + ");");
         return "Op2(" + term.oper.toUpperCase() + ", " + name + ")";
       case "U32":
         return "U_32(" + U64(target,term.numb) + ")";
@@ -392,7 +392,7 @@ function U64(target: string, num: number | bigint): string {
 function GAS(target: string) {
   switch (target) {
     case "ts": return "++GAS";
-    case "c": return "inc_cost(mem)";
+    case "c": return "inc_cost(tid)";
   }
 }
 

@@ -32,7 +32,7 @@ function c_load_dylib() {
   if (c_dylib === null) {
     var path = new URL("./../bin/Runtime.so", import.meta.url);
     c_dylib = Deno.dlopen(path, {
-      "ffi_dynbook_add_page": {parameters: ["u64", "buffer"], result: "void"},
+      "ffi_add_dynfun": {parameters: ["u64", "buffer"], result: "void"},
       "ffi_normal": {parameters: ["buffer","u32", "u32"], result: "void"},
       "ffi_get_cost": {parameters: [], result: "u32"},
       "ffi_get_size": {parameters: [], result: "u32"},
@@ -44,7 +44,7 @@ function c_load_dylib() {
 function c_add_dynbook(book: Runtime.Book) {
   var dylib = c_load_dylib();
   for (var key in book) {
-    dylib.symbols.ffi_dynbook_add_page(Number(key), Dynbook.page_serialize(book[key]));
+    dylib.symbols.ffi_add_dynfun(Number(key), Dynbook.page_serialize(book[key]));
   }
 }
 

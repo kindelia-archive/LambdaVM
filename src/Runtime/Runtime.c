@@ -2,17 +2,22 @@
 #include <stdio.h>
 #include <pthread.h>
 
-// Types
-// -----
+// Numbers
+// -------
 
 typedef unsigned char u8;
 typedef unsigned int u32;
 typedef unsigned long long int u64;
+typedef pthread_t Thd;
+
+const u64 U64_PER_KB = 0x80;
+const u64 U64_PER_MB = 0x20000;
+const u64 U64_PER_GB = 0x8000000;
 
 // Consts
 // ------
 
-const u64 MAX_WORKERS = 8;
+const u64 MAX_THREADS = 8;
 const u64 MAX_DYNFUNS = 65536;
 
 // Terms
@@ -69,22 +74,21 @@ const u64 NEQ = 0xF;
 // -------
 
 typedef struct {
-  u64 size;
+  u64  size;
   u64* data;
 } Arr;
 
 typedef struct {
-  Arr  nodes;
-  Arr  free[16];
-  u32* stack;
+  u64  host;
   u64  cost;
-} Mem;
+  u64  next;
+  Arr  free[16];
+  u32* todo;
+  Thd  thd;
+} Thread;
 
-typedef struct {
-  pthread_t thread;
-  Mem* mem;
-  u64 host;
-} Worker;
+u64* data;
+Thread threads[MAX_THREADS];
 
 // Dynbook
 // -------
@@ -101,15 +105,9 @@ typedef struct {
   Arr match;
   u64 count;
   Rule* rules;
-} Page;
+} Dynfun;
 
-typedef Page** Book;
-
-// Globals
-// -------
-
-Worker workers[MAX_WORKERS];
-Page* book[MAX_DYNFUNS];
+Dynfun* dynfuns[MAX_DYNFUNS];
 
 // Array
 // -----
@@ -213,40 +211,40 @@ u64 get_loc(Lnk lnk, u64 arg) {
   return get_val(lnk) + arg;
 }
 
-Lnk ask_arg(Mem* mem, Lnk term, u64 arg) {
-  return array_read(&mem->nodes, get_loc(term, arg));
+Lnk ask_lnk(u64 loc) {
+  return data[loc];
 }
 
-Lnk ask_lnk(Mem* mem, u64 loc) {
-  return array_read(&mem->nodes, loc);
+Lnk ask_arg(Lnk term, u64 arg) {
+  return ask_lnk(get_loc(term, arg));
 }
 
-u64 link(Mem* mem, u64 loc, Lnk lnk) {
-  array_write(&mem->nodes, loc, lnk);
+u64 link(u64 loc, Lnk lnk) {
+  data[loc] = lnk;
   if (get_tag(lnk) <= VAR) {
-    array_write(&mem->nodes, get_loc(lnk, get_tag(lnk) == DP1 ? 1 : 0), Arg(loc));
+    data[get_loc(lnk, get_tag(lnk) & 1)] = Arg(loc);
   }
   return lnk;
 }
 
-u64 alloc(Mem* mem, u64 size) {
+u64 alloc(u64 tid, u64 size) {
   if (size == 0) {
     return 0;
   } else {
     if (size < 16) {
-      u64 reuse = array_pop(&mem->free[size]);
+      u64 reuse = array_pop(&threads[tid].free[size]);
       if (reuse != -1) {
         return reuse;
       }
     }
-    return __atomic_fetch_add(&mem->nodes.size, size, __ATOMIC_RELAXED);
+    u64 loc = threads[tid].next;
+    threads[tid].next += size;
+    return loc;
   }
 }
 
-void clear(Mem* mem, u64 loc, u64 size) {
-  //mem->free[size].data[mem->free[size].size++] = loc;
-  array_push(&mem->free[size], loc);
-  // TODO
+void clear(u64 tid, u64 loc, u64 size) {
+  array_push(&threads[tid].free[size], loc);
 }
 
 // Debug
@@ -280,46 +278,45 @@ void debug_print_lnk(Lnk x) {
 // Garbage Collection
 // ------------------
 
-void collect(Mem* mem, Lnk term) {
-  return;
+void collect(u64 tid, Lnk term) {
   switch (get_tag(term)) {
     case DP0: {
-      link(mem, get_loc(term,0), Era());
-      //reduce(mem, get_loc(ask_arg(mem,term,1),0));
+      link(get_loc(term,0), Era());
+      //reduce(tid, get_loc(ask_arg(term, 1),0));
       break;
     }
     case DP1: {
-      link(mem, get_loc(term,1), Era());
-      //reduce(mem, get_loc(ask_arg(mem,term,0),0));
+      link(get_loc(term,1), Era());
+      //reduce(tid, get_loc(ask_arg(term, 0),0));
       break;
     }
     case VAR: {
-      link(mem, get_loc(term,0), Era());
+      link(get_loc(term,0), Era());
       break;
     }
     case LAM: {
-      if (get_tag(ask_arg(mem,term,0)) != ERA) {
-        link(mem, get_loc(ask_arg(mem,term,0),0), Era());
+      if (get_tag(ask_arg(term, 0)) != ERA) {
+        link(get_loc(ask_arg(term, 0),0), Era());
       }
-      collect(mem, ask_arg(mem,term,1));
-      clear(mem, get_loc(term,0), 2);
+      collect(tid, ask_arg(term, 1));
+      clear(tid, get_loc(term,0), 2);
       break;
     }
     case APP: {
-      collect(mem, ask_arg(mem,term,0));
-      collect(mem, ask_arg(mem,term,1));
-      clear(mem, get_loc(term,0), 2);
+      collect(tid, ask_arg(term, 0));
+      collect(tid, ask_arg(term, 1));
+      clear(tid, get_loc(term,0), 2);
       break;
     }
     case PAR: {
-      collect(mem, ask_arg(mem,term,0));
-      collect(mem, ask_arg(mem,term,1));
-      clear(mem, get_loc(term,0), 2);
+      collect(tid, ask_arg(term, 0));
+      collect(tid, ask_arg(term, 1));
+      clear(tid, get_loc(term,0), 2);
       break;
     }
     case OP2: {
-      collect(mem, ask_arg(mem,term,0));
-      collect(mem, ask_arg(mem,term,1));
+      collect(tid, ask_arg(term, 0));
+      collect(tid, ask_arg(term, 1));
       break;
     }
     case U32: {
@@ -328,9 +325,9 @@ void collect(Mem* mem, Lnk term) {
     case CTR: case FUN: {
       u64 arity = get_ari(term);
       for (u64 i = 0; i < arity; ++i) {
-        collect(mem, ask_arg(mem,term,i));
+        collect(tid, ask_arg(term, i));
       }
-      clear(mem, get_loc(term,0), arity);
+      clear(tid, get_loc(term,0), arity);
       break;
     }
   }
@@ -339,47 +336,47 @@ void collect(Mem* mem, Lnk term) {
 // Terms
 // -----
 
-void inc_cost(Mem* mem) {
-  mem->cost++;
+void inc_cost(u64 tid) {
+  threads[tid].cost++;
 }
 
-void subst(Mem* mem, Lnk lnk, Lnk val) {
+void subst(u64 tid, Lnk lnk, Lnk val) {
   if (get_tag(lnk) != ERA) {
-    link(mem, get_loc(lnk,0), val);
+    link(get_loc(lnk,0), val);
   } else {
-    collect(mem, val);
+    collect(tid, val);
   }
 }
 
-Lnk app_lam(Mem* mem, u64 host, Lnk term, Lnk arg0) {
-  inc_cost(mem);
-  subst(mem, ask_arg(mem, arg0, 0), ask_arg(mem, term, 1));
-  u64 done = link(mem, host, ask_arg(mem, arg0, 1));
-  clear(mem, get_loc(term,0), 2);
-  clear(mem, get_loc(arg0,0), 2);
+Lnk app_lam(u64 tid, u64 host, Lnk term, Lnk arg0) {
+  inc_cost(tid);
+  subst(tid, ask_arg(arg0, 0), ask_arg(term, 1));
+  u64 done = link(host, ask_arg(arg0, 1));
+  clear(tid, get_loc(term,0), 2);
+  clear(tid, get_loc(arg0,0), 2);
   return done;
 }
 
-Lnk app_par(Mem* mem, u64 host, Lnk term, Lnk arg0) {
-  inc_cost(mem);
+Lnk app_par(u64 tid, u64 host, Lnk term, Lnk arg0) {
+  inc_cost(tid);
   u64 app0 = get_loc(term, 0);
   u64 app1 = get_loc(arg0, 0);
-  u64 let0 = alloc(mem, 3);
-  u64 par0 = alloc(mem, 2);
-  link(mem, let0+2, ask_arg(mem, term, 1));
-  link(mem, app0+1, Dp0(get_ext(arg0), let0));
-  link(mem, app0+0, ask_arg(mem, arg0, 0));
-  link(mem, app1+0, ask_arg(mem, arg0, 1));
-  link(mem, app1+1, Dp1(get_ext(arg0), let0));
-  link(mem, par0+0, App(app0));
-  link(mem, par0+1, App(app1));
+  u64 let0 = alloc(tid, 3);
+  u64 par0 = alloc(tid, 2);
+  link(let0+2, ask_arg(term, 1));
+  link(app0+1, Dp0(get_ext(arg0), let0));
+  link(app0+0, ask_arg(arg0, 0));
+  link(app1+0, ask_arg(arg0, 1));
+  link(app1+1, Dp1(get_ext(arg0), let0));
+  link(par0+0, App(app0));
+  link(par0+1, App(app1));
   u64 done = Par(get_ext(arg0), par0);
-  link(mem, host, done);
+  link(host, done);
   return done;
 }
 
-Lnk op2_u32_u32(Mem* mem, u64 host, Lnk term, Lnk arg0, Lnk arg1) {
-  inc_cost(mem);
+Lnk op2_u32_u32(u64 tid, u64 host, Lnk term, Lnk arg0, Lnk arg1) {
+  inc_cost(tid);
   u64 a = get_val(arg0);
   u64 b = get_val(arg1);
   u64 c = 0;
@@ -402,167 +399,167 @@ Lnk op2_u32_u32(Mem* mem, u64 host, Lnk term, Lnk arg0, Lnk arg1) {
     case NEQ: c = (a != b) ? 1 : 0;      break;
   }
   u64 done = U_32(c);
-  clear(mem, get_loc(term,0), 2);
-  link(mem, host, done);
+  clear(tid, get_loc(term,0), 2);
+  link(host, done);
   return done;
 }
 
-Lnk op2_par_0(Mem* mem, u64 host, Lnk term, Lnk arg0, Lnk arg1) {
-  inc_cost(mem);
+Lnk op2_par_0(u64 tid, u64 host, Lnk term, Lnk arg0, Lnk arg1) {
+  inc_cost(tid);
   u64 op20 = get_loc(term, 0);
   u64 op21 = get_loc(arg0, 0);
-  u64 let0 = alloc(mem, 3);
-  u64 par0 = alloc(mem, 2);
-  link(mem, let0+2, arg1);
-  link(mem, op20+1, Dp0(get_ext(arg0), let0));
-  link(mem, op20+0, ask_arg(mem, arg0, 0));
-  link(mem, op21+0, ask_arg(mem, arg0, 1));
-  link(mem, op21+1, Dp1(get_ext(arg0), let0));
-  link(mem, par0+0, Op2(get_ext(term), op20));
-  link(mem, par0+1, Op2(get_ext(term), op21));
+  u64 let0 = alloc(tid, 3);
+  u64 par0 = alloc(tid, 2);
+  link(let0+2, arg1);
+  link(op20+1, Dp0(get_ext(arg0), let0));
+  link(op20+0, ask_arg(arg0, 0));
+  link(op21+0, ask_arg(arg0, 1));
+  link(op21+1, Dp1(get_ext(arg0), let0));
+  link(par0+0, Op2(get_ext(term), op20));
+  link(par0+1, Op2(get_ext(term), op21));
   u64 done = Par(get_ext(arg0), par0);
-  link(mem, host, done);
+  link(host, done);
   return done;
 }
 
-Lnk op2_par_1(Mem* mem, u64 host, Lnk term, Lnk arg0, Lnk arg1) {
-  inc_cost(mem);
+Lnk op2_par_1(u64 tid, u64 host, Lnk term, Lnk arg0, Lnk arg1) {
+  inc_cost(tid);
   u64 op20 = get_loc(term, 0);
   u64 op21 = get_loc(arg1, 0);
-  u64 let0 = alloc(mem, 3);
-  u64 par0 = alloc(mem, 2);
-  link(mem, let0+2, arg0);
-  link(mem, op20+0, Dp0(get_ext(arg1), let0));
-  link(mem, op20+1, ask_arg(mem, arg1, 0));
-  link(mem, op21+1, ask_arg(mem, arg1, 1));
-  link(mem, op21+0, Dp1(get_ext(arg1), let0));
-  link(mem, par0+0, Op2(get_ext(term), op20));
-  link(mem, par0+1, Op2(get_ext(term), op21));
+  u64 let0 = alloc(tid, 3);
+  u64 par0 = alloc(tid, 2);
+  link(let0+2, arg0);
+  link(op20+0, Dp0(get_ext(arg1), let0));
+  link(op20+1, ask_arg(arg1, 0));
+  link(op21+1, ask_arg(arg1, 1));
+  link(op21+0, Dp1(get_ext(arg1), let0));
+  link(par0+0, Op2(get_ext(term), op20));
+  link(par0+1, Op2(get_ext(term), op21));
   u64 done = Par(get_ext(arg1), par0);
-  link(mem, host, done);
+  link(host, done);
   return done;
 }
 
-Lnk let_lam(Mem* mem, u64 host, Lnk term, Lnk arg0) {
-  inc_cost(mem);
+Lnk let_lam(u64 tid, u64 host, Lnk term, Lnk arg0) {
+  inc_cost(tid);
   u64 let0 = get_loc(term, 0);
   u64 par0 = get_loc(arg0, 0);
-  u64 lam0 = alloc(mem, 2);
-  u64 lam1 = alloc(mem, 2);
-  link(mem, let0+2, ask_arg(mem, arg0, 1));
-  link(mem, par0+1, Var(lam1));
-  u64 arg0_arg_0 = ask_arg(mem, arg0, 0);
-  link(mem, par0+0, Var(lam0));
-  subst(mem, arg0_arg_0, Par(get_ext(term), par0));
-  u64 term_arg_0 = ask_arg(mem,term,0);
-  link(mem, lam0+1, Dp0(get_ext(term), let0));
-  subst(mem, term_arg_0, Lam(lam0));
-  u64 term_arg_1 = ask_arg(mem,term,1);                      
-  link(mem, lam1+1, Dp1(get_ext(term), let0));
-  subst(mem, term_arg_1, Lam(lam1));
+  u64 lam0 = alloc(tid, 2);
+  u64 lam1 = alloc(tid, 2);
+  link(let0+2, ask_arg(arg0, 1));
+  link(par0+1, Var(lam1));
+  u64 arg0_arg_0 = ask_arg(arg0, 0);
+  link(par0+0, Var(lam0));
+  subst(tid, arg0_arg_0, Par(get_ext(term), par0));
+  u64 term_arg_0 = ask_arg(term, 0);
+  link(lam0+1, Dp0(get_ext(term), let0));
+  subst(tid, term_arg_0, Lam(lam0));
+  u64 term_arg_1 = ask_arg(term, 1);                      
+  link(lam1+1, Dp1(get_ext(term), let0));
+  subst(tid, term_arg_1, Lam(lam1));
   u64 done = Lam(get_tag(term) == DP0 ? lam0 : lam1);
-  link(mem, host, done);
+  link(host, done);
   return done;
 }
 
-Lnk let_par_eq(Mem* mem, u64 host, Lnk term, Lnk arg0) {
-  inc_cost(mem);
-  subst(mem, ask_arg(mem,term,0), ask_arg(mem,arg0,0));
-  subst(mem, ask_arg(mem,term,1), ask_arg(mem,arg0,1));
-  u64 done = link(mem, host, ask_arg(mem, arg0, get_tag(term) == DP0 ? 0 : 1));
-  clear(mem, get_loc(term,0), 3);
-  clear(mem, get_loc(arg0,0), 2);
+Lnk let_par_eq(u64 tid, u64 host, Lnk term, Lnk arg0) {
+  inc_cost(tid);
+  subst(tid, ask_arg(term, 0), ask_arg(arg0, 0));
+  subst(tid, ask_arg(term, 1), ask_arg(arg0, 1));
+  u64 done = link(host, ask_arg(arg0, get_tag(term) == DP0 ? 0 : 1));
+  clear(tid, get_loc(term,0), 3);
+  clear(tid, get_loc(arg0,0), 2);
   return done;
 }
 
-Lnk let_par_df(Mem* mem, u64 host, Lnk term, Lnk arg0) {
-  inc_cost(mem);
-  u64 par0 = alloc(mem, 2);
+Lnk let_par_df(u64 tid, u64 host, Lnk term, Lnk arg0) {
+  inc_cost(tid);
+  u64 par0 = alloc(tid, 2);
   u64 let0 = get_loc(term,0);
   u64 par1 = get_loc(arg0,0);
-  u64 let1 = alloc(mem, 3);
-  link(mem, let0+2, ask_arg(mem,arg0,0));
-  link(mem, let1+2, ask_arg(mem,arg0,1));
-  u64 term_arg_0 = ask_arg(mem,term,0);
-  u64 term_arg_1 = ask_arg(mem,term,1);
-  link(mem, par1+0, Dp1(get_ext(term),let0));
-  link(mem, par1+1, Dp1(get_ext(term),let1));
-  link(mem, par0+0, Dp0(get_ext(term),let0));
-  link(mem, par0+1, Dp0(get_ext(term),let1));
-  subst(mem, term_arg_0, Par(get_ext(arg0),par0));
-  subst(mem, term_arg_1, Par(get_ext(arg0),par1));
+  u64 let1 = alloc(tid, 3);
+  link(let0+2, ask_arg(arg0, 0));
+  link(let1+2, ask_arg(arg0, 1));
+  u64 term_arg_0 = ask_arg(term, 0);
+  u64 term_arg_1 = ask_arg(term, 1);
+  link(par1+0, Dp1(get_ext(term),let0));
+  link(par1+1, Dp1(get_ext(term),let1));
+  link(par0+0, Dp0(get_ext(term),let0));
+  link(par0+1, Dp0(get_ext(term),let1));
+  subst(tid, term_arg_0, Par(get_ext(arg0),par0));
+  subst(tid, term_arg_1, Par(get_ext(arg0),par1));
   u64 done = Par(get_ext(arg0), get_tag(term) == DP0 ? par0 : par1);
-  link(mem, host, done);
+  link(host, done);
   return done;
 }
 
-Lnk let_u32(Mem* mem, u64 host, Lnk term, Lnk arg0) {
-  inc_cost(mem);
-  subst(mem, ask_arg(mem,term,0), arg0);
-  subst(mem, ask_arg(mem,term,1), arg0);
+Lnk let_u32(u64 tid, u64 host, Lnk term, Lnk arg0) {
+  inc_cost(tid);
+  subst(tid, ask_arg(term, 0), arg0);
+  subst(tid, ask_arg(term, 1), arg0);
   u64 done = arg0;
-  link(mem, host, arg0);
+  link(host, arg0);
   return done;
 }
 
-Lnk let_ctr(Mem* mem, u64 host, Lnk term, Lnk arg0) {
-  inc_cost(mem);
+Lnk let_ctr(u64 tid, u64 host, Lnk term, Lnk arg0) {
+  inc_cost(tid);
   u64 func = get_ext(arg0);
   u64 arit = get_ari(arg0);
   if (arit == 0) {
-    subst(mem, ask_arg(mem,term,0), Ctr(0, func, 0));
-    subst(mem, ask_arg(mem,term,1), Ctr(0, func, 0));
-    clear(mem, get_loc(term,0), 3);
-    u64 done = link(mem, host, Ctr(0, func, 0));
+    subst(tid, ask_arg(term, 0), Ctr(0, func, 0));
+    subst(tid, ask_arg(term, 1), Ctr(0, func, 0));
+    clear(tid, get_loc(term,0), 3);
+    u64 done = link(host, Ctr(0, func, 0));
     return done;
   } else {
     u64 ctr0 = get_loc(arg0,0);
-    u64 ctr1 = alloc(mem, arit);
-    u64 term_arg_0 = ask_arg(mem,term,0);
-    u64 term_arg_1 = ask_arg(mem,term,1);
+    u64 ctr1 = alloc(tid, arit);
+    u64 term_arg_0 = ask_arg(term, 0);
+    u64 term_arg_1 = ask_arg(term, 1);
     for (u64 i = 0; i < arit; ++i) {
-      u64 leti = i == 0 ? get_loc(term,0) : alloc(mem, 3);
-      u64 arg0_arg_i = ask_arg(mem, arg0, i);
-      link(mem, ctr0+i, Dp0(get_ext(term), leti));
-      link(mem, ctr1+i, Dp1(get_ext(term), leti));
-      link(mem, leti+2, arg0_arg_i);
+      u64 leti = i == 0 ? get_loc(term,0) : alloc(tid, 3);
+      u64 arg0_arg_i = ask_arg(arg0, i);
+      link(ctr0+i, Dp0(get_ext(term), leti));
+      link(ctr1+i, Dp1(get_ext(term), leti));
+      link(leti+2, arg0_arg_i);
     }
-    subst(mem, term_arg_0, Ctr(arit, func, ctr0));
-    subst(mem, term_arg_1, Ctr(arit, func, ctr1));
+    subst(tid, term_arg_0, Ctr(arit, func, ctr0));
+    subst(tid, term_arg_1, Ctr(arit, func, ctr1));
     u64 done = Ctr(arit, func, get_tag(term) == DP0 ? ctr0 : ctr1);
-    link(mem, host, done);
+    link(host, done);
     return done;
   }
 }
 
-Lnk cal_par(Mem* mem, u64 host, Lnk term, Lnk argn, u64 n) {
-  inc_cost(mem);
+Lnk cal_par(u64 tid, u64 host, Lnk term, Lnk argn, u64 n) {
+  inc_cost(tid);
   u64 arit = get_ari(term);
   u64 func = get_ext(term);
   u64 fun0 = get_loc(term, 0);
-  u64 fun1 = alloc(mem, arit);
+  u64 fun1 = alloc(tid, arit);
   u64 par0 = get_loc(argn, 0);
   for (u64 i = 0; i < arit; ++i) {
     if (i != n) {
-      u64 leti = alloc(mem, 3);
-      u64 argi = ask_arg(mem, term, i);
-      link(mem, fun0+i, Dp0(get_ext(argn), leti));
-      link(mem, fun1+i, Dp1(get_ext(argn), leti));
-      link(mem, leti+2, argi);
+      u64 leti = alloc(tid, 3);
+      u64 argi = ask_arg(term, i);
+      link(fun0+i, Dp0(get_ext(argn), leti));
+      link(fun1+i, Dp1(get_ext(argn), leti));
+      link(leti+2, argi);
     } else {
-      link(mem, fun0+i, ask_arg(mem, argn, 0));
-      link(mem, fun1+i, ask_arg(mem, argn, 1));
+      link(fun0+i, ask_arg(argn, 0));
+      link(fun1+i, ask_arg(argn, 1));
     }
   }
-  link(mem, par0+0, Cal(arit, func, fun0));
-  link(mem, par0+1, Cal(arit, func, fun1));
+  link(par0+0, Cal(arit, func, fun0));
+  link(par0+1, Cal(arit, func, fun1));
   u64 done = Par(get_ext(argn), par0);
-  link(mem, host, done);
+  link(host, done);
   return done;
 }
 
 Lnk cal_ctrs(
-  Mem* mem,
+  u64 tid,
   u64 host,
   Arr clrs,
   Arr cols,
@@ -571,10 +568,9 @@ Lnk cal_ctrs(
   Lnk term,
   Arr args
 ) {
-  inc_cost(mem);
-  u64* data = mem->nodes.data;
+  inc_cost(tid);
   u64 size = body.size;
-  u64 aloc = alloc(mem, size);
+  u64 aloc = alloc(tid, size);
   //printf("- cal_ctrs | size: %llu | aloc: %llu\n", size, aloc);
   //printf("-- R: ");
   //debug_print_lnk(root);
@@ -585,52 +581,51 @@ Lnk cal_ctrs(
     if (get_tag(lnk) == OUT) {
       u64 arg = (lnk >> 8) & 0xFF;
       u64 fld = (lnk >> 0) & 0xFF;
-      u64 out = fld == 0xFF ? args.data[arg] : ask_arg(mem, args.data[arg], fld);
-      link(mem, aloc + i, out);
+      u64 out = fld == 0xFF ? args.data[arg] : ask_arg(args.data[arg], fld);
+      link(aloc + i, out);
     } else {
-      array_write(&mem->nodes, aloc + i, lnk + (get_tag(lnk) < U32 ? aloc : 0));
+      data[aloc + i] = lnk + (get_tag(lnk) < U32 ? aloc : 0);
     }
   }
   u64 root_lnk;
   if (get_tag(root) == OUT) {
     u64 root_arg = (root >> 8) & 0xFF;
     u64 root_fld = (root >> 0) & 0xFF;
-    root_lnk = root_fld == 0xFF ? args.data[root_arg] : ask_arg(mem, args.data[root_arg], root_fld);
-    //printf("-- carai %llu %llu\n", root, OUT);
+    root_lnk = root_fld == 0xFF ? args.data[root_arg] : ask_arg(args.data[root_arg], root_fld);
   } else {
     root_lnk = root + (get_tag(root) < U32 ? aloc : 0);
   }
   u64 done = root_lnk;
-  link(mem, host, done);
-  clear(mem, get_loc(term, 0), args.size);
+  link(host, done);
+  clear(tid, get_loc(term, 0), args.size);
   for (u64 i = 0; i < clrs.size; ++i) {
     u64 clr = clrs.data[i];
     if (clr > 0) {
-      clear(mem, get_loc(args.data[i],0), clr);
+      clear(tid, get_loc(args.data[i],0), clr);
     }
   }
   for (u64 i = 0; i < cols.size; ++i) {
-    collect(mem, cols.data[i]);
+    collect(tid, cols.data[i]);
   }
   return done;
 }
 
-u64 reduce_page(Mem* mem, u64 host, Lnk term, Page* page) {
-  //printf("- entering page...\n");
-  u64 args_data[page->match.size];
-  for (u64 arg_index = 0; arg_index < page->match.size; ++arg_index) {
+u64 reduce_dynfun(u64 tid, u64 host, Lnk term, Dynfun* dynfun) {
+  //printf("- entering dynfun...\n");
+  u64 args_data[dynfun->match.size];
+  for (u64 arg_index = 0; arg_index < dynfun->match.size; ++arg_index) {
     //printf("- strict arg %llu\n", arg_index);
-    args_data[arg_index] = ask_arg(mem, term, arg_index);
+    args_data[arg_index] = ask_arg(term, arg_index);
     if (get_tag(args_data[arg_index]) == PAR) {
-      cal_par(mem, host, term, args_data[arg_index], arg_index);
+      cal_par(tid, host, term, args_data[arg_index], arg_index);
       break;
     }
   }
-  //printf("- page has: %llu rules\n", page->count);
+  //printf("- dynfun has: %llu rules\n", dynfun->count);
   u64 matched = 0;
-  for (u64 rule_index = 0; rule_index < page->count; ++rule_index) {
+  for (u64 rule_index = 0; rule_index < dynfun->count; ++rule_index) {
     //printf("- trying to match rule %llu\n", rule_index);
-    Rule rule = page->rules[rule_index];
+    Rule rule = dynfun->rules[rule_index];
     matched = 1;
     for (u64 arg_index = 0; arg_index < rule.test.size; ++arg_index) {
       u64 value = rule.test.data[arg_index];
@@ -646,18 +641,17 @@ u64 reduce_page(Mem* mem, u64 host, Lnk term, Page* page) {
       }
     }
     if (matched) {
-      Arr args = (Arr){page->match.size, args_data};
+      Arr args = (Arr){dynfun->match.size, args_data};
       //printf("- cal_ctrs\n");
-      cal_ctrs(mem, host, rule.clrs, rule.cols, rule.root, rule.body, term, args);
+      cal_ctrs(tid, host, rule.clrs, rule.cols, rule.root, rule.body, term, args);
       break;
     }
   }
   return matched;
 }
 
-
-Lnk reduce(Mem* mem, u64 root) {
-  u32* stack = mem->stack;
+Lnk reduce(u64 tid, u64 root) {
+  u32* stack = threads[tid].todo;
 
   u64 init = 1;
   u64 size = 1;
@@ -665,11 +659,11 @@ Lnk reduce(Mem* mem, u64 root) {
 
   while (1) {
 
-    u64 term = ask_lnk(mem, host);
+    u64 term = ask_lnk(host);
 
     //printf("reducing: host=%d size=%llu init=%llu ", host, size, init); debug_print_lnk(term); printf("\n");
     //for (u64 i = 0; i < size; ++i) {
-      //printf("- %llu ", stack[i]); debug_print_lnk(ask_lnk(mem, stack[i]>>1)); printf("\n");
+      //printf("- %llu ", stack[i]); debug_print_lnk(ask_lnk(stack[i]>>1)); printf("\n");
     //}
     
     if (init == 1) {
@@ -713,11 +707,11 @@ Lnk reduce(Mem* mem, u64 root) {
           // -------------
 
           #ifdef USE_DYNAMIC
-          Page* page = book[fun];
-          if (page) {
+          Dynfun* dynfun = dynfuns[fun];
+          if (dynfun) {
             stack[size++] = host;
-            for (u64 arg_index = 0; arg_index < page->match.size; ++arg_index) {
-              if (page->match.data[arg_index] > 0) {
+            for (u64 arg_index = 0; arg_index < dynfun->match.size; ++arg_index) {
+              if (dynfun->match.data[arg_index] > 0) {
                 //printf("- ue %llu\n", arg_index);
                 stack[size++] = get_loc(term, arg_index) | 0x80000000;
               }
@@ -734,15 +728,15 @@ Lnk reduce(Mem* mem, u64 root) {
 
       switch (get_tag(term)) {
         case APP: {
-          u64 arg0 = ask_arg(mem, term, 0);
+          u64 arg0 = ask_arg(term, 0);
           switch (get_tag(arg0)) {
             case LAM: {
-              app_lam(mem, host, term, arg0);
+              app_lam(tid, host, term, arg0);
               init = 1;
               continue;
             }
             case PAR: {
-              app_par(mem, host, term, arg0);
+              app_par(tid, host, term, arg0);
               break;
             }
           }
@@ -750,47 +744,47 @@ Lnk reduce(Mem* mem, u64 root) {
         }
         case DP0:
         case DP1: {
-          u64 arg0 = ask_arg(mem, term, 2);
+          u64 arg0 = ask_arg(term, 2);
           switch (get_tag(arg0)) {
             case LAM: {
-              let_lam(mem, host, term, arg0);
+              let_lam(tid, host, term, arg0);
               init = 1;
               continue;
             }
             case PAR: {
               if (get_ext(term) == get_ext(arg0)) {
-                let_par_eq(mem, host, term, arg0);
+                let_par_eq(tid, host, term, arg0);
                 init = 1;
                 continue;
               } else {
-                let_par_df(mem, host, term, arg0);
+                let_par_df(tid, host, term, arg0);
                 break;
               }
             }
           }
           if (get_tag(arg0) == U32) {
-            let_u32(mem, host, term, arg0);
+            let_u32(tid, host, term, arg0);
             break;
           }
           if (get_tag(arg0) == CTR) {
-            let_ctr(mem, host, term, arg0);
+            let_ctr(tid, host, term, arg0);
             break;
           }
           break;
         }
         case OP2: {
-          u64 arg0 = ask_arg(mem, term, 0);
-          u64 arg1 = ask_arg(mem, term, 1);
+          u64 arg0 = ask_arg(term, 0);
+          u64 arg1 = ask_arg(term, 1);
           if (get_tag(arg0) == U32 && get_tag(arg1) == U32) {
-            op2_u32_u32(mem, host, term, arg0, arg1);
+            op2_u32_u32(tid, host, term, arg0, arg1);
             break;
           }
           if (get_tag(arg0) == PAR) {
-            op2_par_0(mem, host, term, arg0, arg1);
+            op2_par_0(tid, host, term, arg0, arg1);
             break;
           }
           if (get_tag(arg1) == PAR) {
-            op2_par_1(mem, host, term, arg0, arg1);
+            op2_par_1(tid, host, term, arg0, arg1);
             break;
           }
           break;
@@ -809,11 +803,11 @@ Lnk reduce(Mem* mem, u64 root) {
           #endif
 
           #ifdef USE_DYNAMIC
-          Page* page = book[fun];
+          Dynfun* dynfun = dynfuns[fun];
           //printf("- on term: "); debug_print_lnk(term); printf("\n");
-          //printf("- BOOK[%llu].valid %llu\n", fun, BOOK[fun].valid);
-          if (page) {
-            if (reduce_page(mem, host, term, page)) {
+          //printf("- dynfuns[%llu].valid %llu\n", fun, dynfuns[fun].valid);
+          if (dynfun) {
+            if (reduce_dynfun(tid, host, term, dynfun)) {
               init = 1;
               continue;
             }
@@ -836,7 +830,7 @@ Lnk reduce(Mem* mem, u64 root) {
 
   }
 
-  return ask_lnk(mem, root);
+  return ask_lnk(root);
 }
 
 // sets the nth bit of a bit-array represented as a u64 array
@@ -853,40 +847,40 @@ void normal_fork(u64 tid, u64 host);
 void normal_join(u64 tid);
 
 u64 CAN_SPAWN_THREADS = 1;
-Lnk normal_cont(Mem* mem, u64 host, u64* seen) {
-  Lnk term = ask_lnk(mem, host);
+Lnk normal_cont(u64 tid, u64 host, u64* seen) {
+  Lnk term = ask_lnk(host);
   //printf("normal "); debug_print_lnk(term); printf("\n");
   if (get_bit(seen, host)) {
     return term;
   } else {
-    term = reduce(mem, host);
+    term = reduce(tid, host);
     set_bit(seen, host);
     switch (get_tag(term)) {
       case LAM: {
-        link(mem, get_loc(term,1), normal_cont(mem, get_loc(term,1), seen));
+        link(get_loc(term,1), normal_cont(tid, get_loc(term,1), seen));
         return term;
       }
       case APP: {
-        link(mem, get_loc(term,0), normal_cont(mem, get_loc(term,0), seen));
-        link(mem, get_loc(term,1), normal_cont(mem, get_loc(term,1), seen));
+        link(get_loc(term,0), normal_cont(tid, get_loc(term,0), seen));
+        link(get_loc(term,1), normal_cont(tid, get_loc(term,1), seen));
         return term;
       }
       case PAR: {
-        link(mem, get_loc(term,0), normal_cont(mem, get_loc(term,0), seen));
-        link(mem, get_loc(term,1), normal_cont(mem, get_loc(term,1), seen));
+        link(get_loc(term,0), normal_cont(tid, get_loc(term,0), seen));
+        link(get_loc(term,1), normal_cont(tid, get_loc(term,1), seen));
         return term;
       }
       case DP0: {
-        link(mem, get_loc(term,2), normal_cont(mem, get_loc(term,2), seen));
+        link(get_loc(term,2), normal_cont(tid, get_loc(term,2), seen));
         return term;
       }
       case DP1: {
-        link(mem, get_loc(term,2), normal_cont(mem, get_loc(term,2), seen));
+        link(get_loc(term,2), normal_cont(tid, get_loc(term,2), seen));
         return term;
       }
       case CTR: case FUN: {
         u64 arity = (u64)get_ari(term);
-        if (CAN_SPAWN_THREADS && arity > 1 && arity <= MAX_WORKERS) {
+        if (CAN_SPAWN_THREADS && arity > 1 && arity <= MAX_THREADS) {
           CAN_SPAWN_THREADS = 0;
           for (u64 t = 0; t < arity; ++t) {
             normal_fork(t, get_loc(term,t));
@@ -896,7 +890,7 @@ Lnk normal_cont(Mem* mem, u64 host, u64* seen) {
           }
         } else {
           for (u64 i = 0; i < arity; ++i) {
-            link(mem, get_loc(term,i), normal_cont(mem, get_loc(term,i), seen));
+            link(get_loc(term,i), normal_cont(tid, get_loc(term,i), seen));
           }
         }
         return term;
@@ -908,85 +902,84 @@ Lnk normal_cont(Mem* mem, u64 host, u64* seen) {
   }
 }
 
-Lnk normal(Mem* mem, u64 host) {
+Lnk normal(u64 tid, u64 host) {
   const u64 size = 4194304; // uses 32 MB, covers heaps up to 2 GB
   static u64 seen[size]; 
   for (u64 i = 0; i < size; ++i) {
     seen[i] = 0;
   }
-  return normal_cont(mem, host, seen);
+  return normal_cont(tid, host, seen);
 }
 
 void *normal_thread(void *args_ptr) {
   u64 tid = (u64)args_ptr;
-  normal(workers[tid].mem, workers[tid].host);
+  normal(tid, threads[tid].host);
   return 0;
 }
 
 void normal_fork(u64 tid, u64 host) {
   printf("* spawning thread: %llu\n", tid);
-  workers[tid].host = host;
-  pthread_create(&workers[tid].thread, NULL, &normal_thread, (void*)tid);
+  threads[tid].host = host;
+  pthread_create(&threads[tid].thd, NULL, &normal_thread, (void*)tid);
 }
 
 void normal_join(u64 tid) {
-  pthread_join(workers[tid].thread, NULL);
+  pthread_join(threads[tid].thd, NULL);
 }
 
 // FFI
 // ---
 
-void ffi_dynbook_add_page(u64 page_index, u64* page_data) {
-  //printf("dynbook_add_page: %llu %llu %llu %llu ...\n", page_data[0], page_data[1], page_data[2], page_data[3]);
+void ffi_add_dynfun(u64 dynfun_index, u64* dynfun_data) {
+  //printf("dynbook_add_dynfun: %llu %llu %llu %llu ...\n", dynfun_data[0], dynfun_data[1], dynfun_data[2], dynfun_data[3]);
 
-  Page* page = book[page_index] = malloc(sizeof(Page));
+  Dynfun* dynfun = dynfuns[dynfun_index] = malloc(sizeof(Dynfun));
 
   u64 i = 0;
-  page->match.size = page_data[i++];
-  //printf("match.size: %llu\n", page->match.size);
-  page->match.data = (u64*)malloc(page->match.size * sizeof(u64));
-  for (u64 n = 0; n < page->match.size; ++n) {
-    page->match.data[n] = page_data[i++];
+  dynfun->match.size = dynfun_data[i++];
+  //printf("match.size: %llu\n", dynfun->match.size);
+  dynfun->match.data = (u64*)malloc(dynfun->match.size * sizeof(u64));
+  for (u64 n = 0; n < dynfun->match.size; ++n) {
+    dynfun->match.data[n] = dynfun_data[i++];
   }
 
-  page->count = page_data[i++];
-  page->rules = (Rule*)malloc(page->count * sizeof(Rule));
-  //printf("rule count: %llu\n", page->count);
+  dynfun->count = dynfun_data[i++];
+  dynfun->rules = (Rule*)malloc(dynfun->count * sizeof(Rule));
+  //printf("rule count: %llu\n", dynfun->count);
 
-  for (u64 r = 0; r < page->count; ++r) {
+  for (u64 r = 0; r < dynfun->count; ++r) {
     //printf("on rule %llu\n", r);
-    page->rules[r].test.size = page_data[i++];
-    //printf("- test.size: %llu\n", page->rules[r].test.size);
-    page->rules[r].test.data = (u64*)malloc(page->rules[r].test.size * sizeof(u64));
-    for (u64 n = 0; n < page->rules[r].test.size; ++n) {
-      page->rules[r].test.data[n] = page_data[i++];
+    dynfun->rules[r].test.size = dynfun_data[i++];
+    //printf("- test.size: %llu\n", dynfun->rules[r].test.size);
+    dynfun->rules[r].test.data = (u64*)malloc(dynfun->rules[r].test.size * sizeof(u64));
+    for (u64 n = 0; n < dynfun->rules[r].test.size; ++n) {
+      dynfun->rules[r].test.data[n] = dynfun_data[i++];
     }
 
-    page->rules[r].root = page_data[i++];
-    //printf("- root: %llu\n", page->rules[r].root);
-    page->rules[r].body.size = page_data[i++];
-    //printf("- body.size: %llu\n", page->rules[r].body.size);
-    page->rules[r].body.data = (u64*)malloc(page->rules[r].body.size * sizeof(u64));
-    for (u64 n = 0; n < page->rules[r].body.size; ++n) {
-      page->rules[r].body.data[n] = page_data[i++];
+    dynfun->rules[r].root = dynfun_data[i++];
+    //printf("- root: %llu\n", dynfun->rules[r].root);
+    dynfun->rules[r].body.size = dynfun_data[i++];
+    //printf("- body.size: %llu\n", dynfun->rules[r].body.size);
+    dynfun->rules[r].body.data = (u64*)malloc(dynfun->rules[r].body.size * sizeof(u64));
+    for (u64 n = 0; n < dynfun->rules[r].body.size; ++n) {
+      dynfun->rules[r].body.data[n] = dynfun_data[i++];
     }
 
-    page->rules[r].clrs.size = page_data[i++];
-    //printf("- clrs.size: %llu\n", page->rules[r].clrs.size);
-    page->rules[r].clrs.data = (u64*)malloc(page->rules[r].clrs.size * sizeof(u64));
-    for (u64 n = 0; n < page->rules[r].clrs.size; ++n) {
-      page->rules[r].clrs.data[n] = page_data[i++];
+    dynfun->rules[r].clrs.size = dynfun_data[i++];
+    //printf("- clrs.size: %llu\n", dynfun->rules[r].clrs.size);
+    dynfun->rules[r].clrs.data = (u64*)malloc(dynfun->rules[r].clrs.size * sizeof(u64));
+    for (u64 n = 0; n < dynfun->rules[r].clrs.size; ++n) {
+      dynfun->rules[r].clrs.data[n] = dynfun_data[i++];
     }
 
-    page->rules[r].cols.size = page_data[i++];
-    //printf("- cols.size: %llu\n", page->rules[r].cols.size);
-    page->rules[r].cols.data = (u64*)malloc(page->rules[r].cols.size * sizeof(u64));
-    for (u64 n = 0; n < page->rules[r].cols.size; ++n) {
-      page->rules[r].cols.data[n] = page_data[i++];
+    dynfun->rules[r].cols.size = dynfun_data[i++];
+    //printf("- cols.size: %llu\n", dynfun->rules[r].cols.size);
+    dynfun->rules[r].cols.data = (u64*)malloc(dynfun->rules[r].cols.size * sizeof(u64));
+    for (u64 n = 0; n < dynfun->rules[r].cols.size; ++n) {
+      dynfun->rules[r].cols.data[n] = dynfun_data[i++];
     }
   }
 }
-
 
 u64 ffi_cost = 0;
 u64 ffi_size = 0;
@@ -1001,19 +994,18 @@ u64 ffi_get_size() {
 
 void ffi_normal(u8* mem_data, u32 mem_size, u32 host) {
 
+  data = (u64*)mem_data;
+
   // Init thread objects
-  Mem mem;
-  mem.nodes.data = (u64*)mem_data;
-  mem.nodes.size = (u64)mem_size;
+  threads[0].next = (u64)mem_size;
   for (u64 i = 0; i < 16; ++i) {
-    mem.free[i].size = 0;
-    mem.free[i].data = malloc(256 * 1024 * 1024 * sizeof(u64));
+    threads[0].free[i].size = 0;
+    threads[0].free[i].data = malloc(256 * 1024 * 1024 * sizeof(u64));
   }
-  mem.stack = malloc(64 * 1024 * 1024 * sizeof(u64)); // 64 MB
-  mem.cost = 0;
-  for (u64 t = 0; t < MAX_WORKERS; ++t) {
-    workers[t].thread = NULL;
-    workers[t].mem = &mem;
+  threads[0].todo = malloc(64 * 1024 * 1024 * sizeof(u64)); // 64 MB
+  threads[0].cost = 0;
+  for (u64 t = 0; t < MAX_THREADS; ++t) {
+    threads[t].thd = NULL;
   }
 
   //printf("got: %llu %llu %llu\n", get_tag(mem.data[0])/TAG, get_ext(mem.data[0])/EXT, get_val(mem.data[0]));
@@ -1024,23 +1016,23 @@ void ffi_normal(u8* mem_data, u32 mem_size, u32 host) {
   
   // Clears mallocs
   for (u64 i = 0; i < MAX_DYNFUNS; ++i) {
-    Page* page = book[i];
-    if (page) {
-      free(page->match.data);
-      for (u64 j = 0; j < page->count; ++j) {
-        free(page->rules[j].test.data);
-        free(page->rules[j].clrs.data);
-        free(page->rules[j].cols.data);
-        free(page->rules[j].body.data);
+    Dynfun* dynfun = dynfuns[i];
+    if (dynfun) {
+      free(dynfun->match.data);
+      for (u64 j = 0; j < dynfun->count; ++j) {
+        free(dynfun->rules[j].test.data);
+        free(dynfun->rules[j].clrs.data);
+        free(dynfun->rules[j].cols.data);
+        free(dynfun->rules[j].body.data);
       }
-      free(page->rules);
-      free(page);
+      free(dynfun->rules);
+      free(dynfun);
     }
   }
-  free(mem.stack);
+  free(threads[0].todo);
   
-  ffi_cost = mem.cost;
-  ffi_size = mem.nodes.size;
+  ffi_cost = threads[0].cost;
+  ffi_size = threads[0].next;
 }
 
 // Main
