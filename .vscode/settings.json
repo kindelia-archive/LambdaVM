@@ -5,6 +5,7 @@
     "deno.config": "./deno.json",
     "cSpell.words": [
         "cwrap",
-        "dynbook"
+        "dynbook",
+        "Lambolt"
     ]
 }

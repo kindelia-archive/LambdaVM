@@ -1,9 +1,15 @@
+web-stuff: deno-bundle emscripten
+
+deno-bundle:
+	deno bundle ./src/exports.ts > ./web/src/generated/base.js
+
 emscripten:
 	mkdir -p ./web/src/generated
 	mkdir -p ./web/serve/
 	emcc --no-entry \
 		-s MODULARIZE=1 -s EXPORT_ES6 \
 		-s TOTAL_MEMORY=67108864 \
+		-s ALLOW_MEMORY_GROWTH=1 \
 		-s EXPORTED_FUNCTIONS=_malloc,_ffi_dynbook_add_page,_ffi_get_cost,_ffi_get_size,_ffi_normal \
 		-s EXPORTED_RUNTIME_METHODS='["ccall","cwrap"]' \
 		./src/Runtime/Runtime.c \
