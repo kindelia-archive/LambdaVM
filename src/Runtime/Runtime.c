@@ -392,190 +392,6 @@ void subst(Worker* mem, Lnk lnk, Lnk val) {
   }
 }
 
-Lnk app_lam(Worker* mem, u64 host, Lnk term, Lnk arg0) {
-  inc_cost(mem);
-  subst(mem, ask_arg(mem, arg0, 0), ask_arg(mem, term, 1));
-  u64 done = link(mem, host, ask_arg(mem, arg0, 1));
-  clear(mem, get_loc(term,0), 2);
-  clear(mem, get_loc(arg0,0), 2);
-  return done;
-}
-
-Lnk app_par(Worker* mem, u64 host, Lnk term, Lnk arg0) {
-  inc_cost(mem);
-  u64 app0 = get_loc(term, 0);
-  u64 app1 = get_loc(arg0, 0);
-  u64 let0 = alloc(mem, 3);
-  u64 par0 = alloc(mem, 2);
-  link(mem, let0+2, ask_arg(mem, term, 1));
-  link(mem, app0+1, Dp0(get_ext(arg0), let0));
-  link(mem, app0+0, ask_arg(mem, arg0, 0));
-  link(mem, app1+0, ask_arg(mem, arg0, 1));
-  link(mem, app1+1, Dp1(get_ext(arg0), let0));
-  link(mem, par0+0, App(app0));
-  link(mem, par0+1, App(app1));
-  u64 done = Par(get_ext(arg0), par0);
-  link(mem, host, done);
-  return done;
-}
-
-Lnk op2_u32_u32(Worker* mem, u64 host, Lnk term, Lnk arg0, Lnk arg1) {
-  inc_cost(mem);
-  u64 a = get_val(arg0);
-  u64 b = get_val(arg1);
-  u64 c = 0;
-  switch (get_ext(term)) {
-    case ADD: c = (a +  b) & 0xFFFFFFFF; break;
-    case SUB: c = (a -  b) & 0xFFFFFFFF; break;
-    case MUL: c = (a *  b) & 0xFFFFFFFF; break;
-    case DIV: c = (a /  b) & 0xFFFFFFFF; break;
-    case MOD: c = (a %  b) & 0xFFFFFFFF; break;
-    case AND: c = (a &  b) & 0xFFFFFFFF; break;
-    case OR : c = (a |  b) & 0xFFFFFFFF; break;
-    case XOR: c = (a ^  b) & 0xFFFFFFFF; break;
-    case SHL: c = (a << b) & 0xFFFFFFFF; break;
-    case SHR: c = (a >> b) & 0xFFFFFFFF; break;
-    case LTN: c = (a <  b) ? 1 : 0;      break;
-    case LTE: c = (a <= b) ? 1 : 0;      break;
-    case EQL: c = (a == b) ? 1 : 0;      break;
-    case GTE: c = (a >= b) ? 1 : 0;      break;
-    case GTN: c = (a >  b) ? 1 : 0;      break;
-    case NEQ: c = (a != b) ? 1 : 0;      break;
-  }
-  u64 done = U_32(c);
-  clear(mem, get_loc(term,0), 2);
-  link(mem, host, done);
-  return done;
-}
-
-Lnk op2_par_0(Worker* mem, u64 host, Lnk term, Lnk arg0, Lnk arg1) {
-  inc_cost(mem);
-  u64 op20 = get_loc(term, 0);
-  u64 op21 = get_loc(arg0, 0);
-  u64 let0 = alloc(mem, 3);
-  u64 par0 = alloc(mem, 2);
-  link(mem, let0+2, arg1);
-  link(mem, op20+1, Dp0(get_ext(arg0), let0));
-  link(mem, op20+0, ask_arg(mem, arg0, 0));
-  link(mem, op21+0, ask_arg(mem, arg0, 1));
-  link(mem, op21+1, Dp1(get_ext(arg0), let0));
-  link(mem, par0+0, Op2(get_ext(term), op20));
-  link(mem, par0+1, Op2(get_ext(term), op21));
-  u64 done = Par(get_ext(arg0), par0);
-  link(mem, host, done);
-  return done;
-}
-
-Lnk op2_par_1(Worker* mem, u64 host, Lnk term, Lnk arg0, Lnk arg1) {
-  inc_cost(mem);
-  u64 op20 = get_loc(term, 0);
-  u64 op21 = get_loc(arg1, 0);
-  u64 let0 = alloc(mem, 3);
-  u64 par0 = alloc(mem, 2);
-  link(mem, let0+2, arg0);
-  link(mem, op20+0, Dp0(get_ext(arg1), let0));
-  link(mem, op20+1, ask_arg(mem, arg1, 0));
-  link(mem, op21+1, ask_arg(mem, arg1, 1));
-  link(mem, op21+0, Dp1(get_ext(arg1), let0));
-  link(mem, par0+0, Op2(get_ext(term), op20));
-  link(mem, par0+1, Op2(get_ext(term), op21));
-  u64 done = Par(get_ext(arg1), par0);
-  link(mem, host, done);
-  return done;
-}
-
-Lnk let_lam(Worker* mem, u64 host, Lnk term, Lnk arg0) {
-  inc_cost(mem);
-  u64 let0 = get_loc(term, 0);
-  u64 par0 = get_loc(arg0, 0);
-  u64 lam0 = alloc(mem, 2);
-  u64 lam1 = alloc(mem, 2);
-  link(mem, let0+2, ask_arg(mem, arg0, 1));
-  link(mem, par0+1, Var(lam1));
-  u64 arg0_arg_0 = ask_arg(mem, arg0, 0);
-  link(mem, par0+0, Var(lam0));
-  subst(mem, arg0_arg_0, Par(get_ext(term), par0));
-  u64 term_arg_0 = ask_arg(mem,term,0);
-  link(mem, lam0+1, Dp0(get_ext(term), let0));
-  subst(mem, term_arg_0, Lam(lam0));
-  u64 term_arg_1 = ask_arg(mem,term,1);                      
-  link(mem, lam1+1, Dp1(get_ext(term), let0));
-  subst(mem, term_arg_1, Lam(lam1));
-  u64 done = Lam(get_tag(term) == DP0 ? lam0 : lam1);
-  link(mem, host, done);
-  return done;
-}
-
-Lnk let_par_eq(Worker* mem, u64 host, Lnk term, Lnk arg0) {
-  inc_cost(mem);
-  subst(mem, ask_arg(mem,term,0), ask_arg(mem,arg0,0));
-  subst(mem, ask_arg(mem,term,1), ask_arg(mem,arg0,1));
-  u64 done = link(mem, host, ask_arg(mem, arg0, get_tag(term) == DP0 ? 0 : 1));
-  clear(mem, get_loc(term,0), 3);
-  clear(mem, get_loc(arg0,0), 2);
-  return done;
-}
-
-Lnk let_par_df(Worker* mem, u64 host, Lnk term, Lnk arg0) {
-  inc_cost(mem);
-  u64 par0 = alloc(mem, 2);
-  u64 let0 = get_loc(term,0);
-  u64 par1 = get_loc(arg0,0);
-  u64 let1 = alloc(mem, 3);
-  link(mem, let0+2, ask_arg(mem,arg0,0));
-  link(mem, let1+2, ask_arg(mem,arg0,1));
-  u64 term_arg_0 = ask_arg(mem,term,0);
-  u64 term_arg_1 = ask_arg(mem,term,1);
-  link(mem, par1+0, Dp1(get_ext(term),let0));
-  link(mem, par1+1, Dp1(get_ext(term),let1));
-  link(mem, par0+0, Dp0(get_ext(term),let0));
-  link(mem, par0+1, Dp0(get_ext(term),let1));
-  subst(mem, term_arg_0, Par(get_ext(arg0),par0));
-  subst(mem, term_arg_1, Par(get_ext(arg0),par1));
-  u64 done = Par(get_ext(arg0), get_tag(term) == DP0 ? par0 : par1);
-  link(mem, host, done);
-  return done;
-}
-
-Lnk let_u32(Worker* mem, u64 host, Lnk term, Lnk arg0) {
-  inc_cost(mem);
-  subst(mem, ask_arg(mem,term,0), arg0);
-  subst(mem, ask_arg(mem,term,1), arg0);
-  u64 done = arg0;
-  link(mem, host, arg0);
-  return done;
-}
-
-Lnk let_ctr(Worker* mem, u64 host, Lnk term, Lnk arg0) {
-  inc_cost(mem);
-  u64 func = get_ext(arg0);
-  u64 arit = get_ari(arg0);
-  if (arit == 0) {
-    subst(mem, ask_arg(mem,term,0), Ctr(0, func, 0));
-    subst(mem, ask_arg(mem,term,1), Ctr(0, func, 0));
-    clear(mem, get_loc(term,0), 3);
-    u64 done = link(mem, host, Ctr(0, func, 0));
-    return done;
-  } else {
-    u64 ctr0 = get_loc(arg0,0);
-    u64 ctr1 = alloc(mem, arit);
-    u64 term_arg_0 = ask_arg(mem,term,0);
-    u64 term_arg_1 = ask_arg(mem,term,1);
-    for (u64 i = 0; i < arit; ++i) {
-      u64 leti = i == 0 ? get_loc(term,0) : alloc(mem, 3);
-      u64 arg0_arg_i = ask_arg(mem, arg0, i);
-      link(mem, ctr0+i, Dp0(get_ext(term), leti));
-      link(mem, ctr1+i, Dp1(get_ext(term), leti));
-      link(mem, leti+2, arg0_arg_i);
-    }
-    subst(mem, term_arg_0, Ctr(arit, func, ctr0));
-    subst(mem, term_arg_1, Ctr(arit, func, ctr1));
-    u64 done = Ctr(arit, func, get_tag(term) == DP0 ? ctr0 : ctr1);
-    link(mem, host, done);
-    return done;
-  }
-}
-
 Lnk cal_par(Worker* mem, u64 host, Lnk term, Lnk argn, u64 n) {
   inc_cost(mem);
   u64 arit = get_ari(term);
@@ -786,12 +602,29 @@ Lnk reduce(Worker* mem, u64 root, u64 depth) {
           u64 arg0 = ask_arg(mem, term, 0);
           switch (get_tag(arg0)) {
             case LAM: {
-              app_lam(mem, host, term, arg0);
+              inc_cost(mem);
+              subst(mem, ask_arg(mem, arg0, 0), ask_arg(mem, term, 1));
+              u64 done = link(mem, host, ask_arg(mem, arg0, 1));
+              clear(mem, get_loc(term,0), 2);
+              clear(mem, get_loc(arg0,0), 2);
               init = 1;
               continue;
             }
             case PAR: {
-              app_par(mem, host, term, arg0);
+              inc_cost(mem);
+              u64 app0 = get_loc(term, 0);
+              u64 app1 = get_loc(arg0, 0);
+              u64 let0 = alloc(mem, 3);
+              u64 par0 = alloc(mem, 2);
+              link(mem, let0+2, ask_arg(mem, term, 1));
+              link(mem, app0+1, Dp0(get_ext(arg0), let0));
+              link(mem, app0+0, ask_arg(mem, arg0, 0));
+              link(mem, app1+0, ask_arg(mem, arg0, 1));
+              link(mem, app1+1, Dp1(get_ext(arg0), let0));
+              link(mem, par0+0, App(app0));
+              link(mem, par0+1, App(app1));
+              u64 done = Par(get_ext(arg0), par0);
+              link(mem, host, done);
               break;
             }
           }
@@ -802,27 +635,93 @@ Lnk reduce(Worker* mem, u64 root, u64 depth) {
           u64 arg0 = ask_arg(mem, term, 2);
           switch (get_tag(arg0)) {
             case LAM: {
-              let_lam(mem, host, term, arg0);
+              inc_cost(mem);
+              u64 let0 = get_loc(term, 0);
+              u64 par0 = get_loc(arg0, 0);
+              u64 lam0 = alloc(mem, 2);
+              u64 lam1 = alloc(mem, 2);
+              link(mem, let0+2, ask_arg(mem, arg0, 1));
+              link(mem, par0+1, Var(lam1));
+              u64 arg0_arg_0 = ask_arg(mem, arg0, 0);
+              link(mem, par0+0, Var(lam0));
+              subst(mem, arg0_arg_0, Par(get_ext(term), par0));
+              u64 term_arg_0 = ask_arg(mem,term,0);
+              link(mem, lam0+1, Dp0(get_ext(term), let0));
+              subst(mem, term_arg_0, Lam(lam0));
+              u64 term_arg_1 = ask_arg(mem,term,1);                      
+              link(mem, lam1+1, Dp1(get_ext(term), let0));
+              subst(mem, term_arg_1, Lam(lam1));
+              u64 done = Lam(get_tag(term) == DP0 ? lam0 : lam1);
+              link(mem, host, done);
               init = 1;
               continue;
             }
             case PAR: {
               if (get_ext(term) == get_ext(arg0)) {
-                let_par_eq(mem, host, term, arg0);
+                inc_cost(mem);
+                subst(mem, ask_arg(mem,term,0), ask_arg(mem,arg0,0));
+                subst(mem, ask_arg(mem,term,1), ask_arg(mem,arg0,1));
+                u64 done = link(mem, host, ask_arg(mem, arg0, get_tag(term) == DP0 ? 0 : 1));
+                clear(mem, get_loc(term,0), 3);
+                clear(mem, get_loc(arg0,0), 2);
                 init = 1;
                 continue;
               } else {
-                let_par_df(mem, host, term, arg0);
+                inc_cost(mem);
+                u64 par0 = alloc(mem, 2);
+                u64 let0 = get_loc(term,0);
+                u64 par1 = get_loc(arg0,0);
+                u64 let1 = alloc(mem, 3);
+                link(mem, let0+2, ask_arg(mem,arg0,0));
+                link(mem, let1+2, ask_arg(mem,arg0,1));
+                u64 term_arg_0 = ask_arg(mem,term,0);
+                u64 term_arg_1 = ask_arg(mem,term,1);
+                link(mem, par1+0, Dp1(get_ext(term),let0));
+                link(mem, par1+1, Dp1(get_ext(term),let1));
+                link(mem, par0+0, Dp0(get_ext(term),let0));
+                link(mem, par0+1, Dp0(get_ext(term),let1));
+                subst(mem, term_arg_0, Par(get_ext(arg0),par0));
+                subst(mem, term_arg_1, Par(get_ext(arg0),par1));
+                u64 done = Par(get_ext(arg0), get_tag(term) == DP0 ? par0 : par1);
+                link(mem, host, done);
                 break;
               }
             }
           }
           if (get_tag(arg0) == U32) {
-            let_u32(mem, host, term, arg0);
+            inc_cost(mem);
+            subst(mem, ask_arg(mem,term,0), arg0);
+            subst(mem, ask_arg(mem,term,1), arg0);
+            u64 done = arg0;
+            link(mem, host, arg0);
             break;
           }
           if (get_tag(arg0) == CTR) {
-            let_ctr(mem, host, term, arg0);
+            inc_cost(mem);
+            u64 func = get_ext(arg0);
+            u64 arit = get_ari(arg0);
+            if (arit == 0) {
+              subst(mem, ask_arg(mem,term,0), Ctr(0, func, 0));
+              subst(mem, ask_arg(mem,term,1), Ctr(0, func, 0));
+              clear(mem, get_loc(term,0), 3);
+              u64 done = link(mem, host, Ctr(0, func, 0));
+            } else {
+              u64 ctr0 = get_loc(arg0,0);
+              u64 ctr1 = alloc(mem, arit);
+              u64 term_arg_0 = ask_arg(mem,term,0);
+              u64 term_arg_1 = ask_arg(mem,term,1);
+              for (u64 i = 0; i < arit; ++i) {
+                u64 leti = i == 0 ? get_loc(term,0) : alloc(mem, 3);
+                u64 arg0_arg_i = ask_arg(mem, arg0, i);
+                link(mem, ctr0+i, Dp0(get_ext(term), leti));
+                link(mem, ctr1+i, Dp1(get_ext(term), leti));
+                link(mem, leti+2, arg0_arg_i);
+              }
+              subst(mem, term_arg_0, Ctr(arit, func, ctr0));
+              subst(mem, term_arg_1, Ctr(arit, func, ctr1));
+              u64 done = Ctr(arit, func, get_tag(term) == DP0 ? ctr0 : ctr1);
+              link(mem, host, done);
+            }
             break;
           }
           break;
@@ -831,15 +730,65 @@ Lnk reduce(Worker* mem, u64 root, u64 depth) {
           u64 arg0 = ask_arg(mem, term, 0);
           u64 arg1 = ask_arg(mem, term, 1);
           if (get_tag(arg0) == U32 && get_tag(arg1) == U32) {
-            op2_u32_u32(mem, host, term, arg0, arg1);
+            inc_cost(mem);
+            u64 a = get_val(arg0);
+            u64 b = get_val(arg1);
+            u64 c = 0;
+            switch (get_ext(term)) {
+              case ADD: c = (a +  b) & 0xFFFFFFFF; break;
+              case SUB: c = (a -  b) & 0xFFFFFFFF; break;
+              case MUL: c = (a *  b) & 0xFFFFFFFF; break;
+              case DIV: c = (a /  b) & 0xFFFFFFFF; break;
+              case MOD: c = (a %  b) & 0xFFFFFFFF; break;
+              case AND: c = (a &  b) & 0xFFFFFFFF; break;
+              case OR : c = (a |  b) & 0xFFFFFFFF; break;
+              case XOR: c = (a ^  b) & 0xFFFFFFFF; break;
+              case SHL: c = (a << b) & 0xFFFFFFFF; break;
+              case SHR: c = (a >> b) & 0xFFFFFFFF; break;
+              case LTN: c = (a <  b) ? 1 : 0;      break;
+              case LTE: c = (a <= b) ? 1 : 0;      break;
+              case EQL: c = (a == b) ? 1 : 0;      break;
+              case GTE: c = (a >= b) ? 1 : 0;      break;
+              case GTN: c = (a >  b) ? 1 : 0;      break;
+              case NEQ: c = (a != b) ? 1 : 0;      break;
+            }
+            u64 done = U_32(c);
+            clear(mem, get_loc(term,0), 2);
+            link(mem, host, done);
             break;
           }
           if (get_tag(arg0) == PAR) {
-            op2_par_0(mem, host, term, arg0, arg1);
+            inc_cost(mem);
+            u64 op20 = get_loc(term, 0);
+            u64 op21 = get_loc(arg0, 0);
+            u64 let0 = alloc(mem, 3);
+            u64 par0 = alloc(mem, 2);
+            link(mem, let0+2, arg1);
+            link(mem, op20+1, Dp0(get_ext(arg0), let0));
+            link(mem, op20+0, ask_arg(mem, arg0, 0));
+            link(mem, op21+0, ask_arg(mem, arg0, 1));
+            link(mem, op21+1, Dp1(get_ext(arg0), let0));
+            link(mem, par0+0, Op2(get_ext(term), op20));
+            link(mem, par0+1, Op2(get_ext(term), op21));
+            u64 done = Par(get_ext(arg0), par0);
+            link(mem, host, done);
             break;
           }
           if (get_tag(arg1) == PAR) {
-            op2_par_1(mem, host, term, arg0, arg1);
+            inc_cost(mem);
+            u64 op20 = get_loc(term, 0);
+            u64 op21 = get_loc(arg1, 0);
+            u64 let0 = alloc(mem, 3);
+            u64 par0 = alloc(mem, 2);
+            link(mem, let0+2, arg0);
+            link(mem, op20+0, Dp0(get_ext(arg1), let0));
+            link(mem, op20+1, ask_arg(mem, arg1, 0));
+            link(mem, op21+1, ask_arg(mem, arg1, 1));
+            link(mem, op21+0, Dp1(get_ext(arg1), let0));
+            link(mem, par0+0, Op2(get_ext(term), op20));
+            link(mem, par0+1, Op2(get_ext(term), op21));
+            u64 done = Par(get_ext(arg1), par0);
+            link(mem, host, done);
             break;
           }
           break;
