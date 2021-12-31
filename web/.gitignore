@@ -1,0 +1,4 @@
+/build/
+/src/generated/
+/serve/js/
+/serve/*.wasm

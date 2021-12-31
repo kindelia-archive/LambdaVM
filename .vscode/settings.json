@@ -2,5 +2,10 @@
     "deno.enable": true,
     "deno.lint": true,
     "deno.unstable": true,
-    "deno.config": "./deno.json"
+    "deno.config": "./deno.json",
+    "cSpell.words": [
+        "cwrap",
+        "dynbook",
+        "Lambolt"
+    ]
 }
