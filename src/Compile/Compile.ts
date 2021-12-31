@@ -322,13 +322,47 @@ export function compile_group_step_1(
         }
         return (is_call[term.name] ? "Cal" : "Ctr") + "(" + ctr_args.length + ", " + (compile_constructor_name(term.name)||0) + ", " + name + ")";
       case "Op2":
+        var retx = fresh("ret");
         var name = fresh("op2");
         var val0 = compile_term(term.val0, tab, uses);
         var val1 = compile_term(term.val1, tab, uses);
-        text += line(tab, VAR(target) + " " + name + " = alloc(mem, 2);");
-        text += line(tab, "link(mem, " + name+"+"+U64(target,0)+", " + val0 + ");");
-        text += line(tab, "link(mem, " + name+"+"+U64(target,1)+", " + val1 + ");");
-        return "Op2(" + term.oper.toUpperCase() + ", " + name + ")";
+        text += line(tab+0, VAR(target) + " " + retx + ";");
+        // Optimization: do inline operation, avoiding Op2 allocation, when operands are already number
+        var INLINE_NUMBERS = true;
+        if (INLINE_NUMBERS) {
+          text += line(tab+0, "if (get_tag("+val0+") == U32 && get_tag("+val1+") == U32) {");
+          var a = "get_val("+val0+")";
+          var b = "get_val("+val1+")";
+          switch (term.oper) {
+            case "ADD": text += line(tab+1, `${retx} = U_32(${a} + ${b});`); break;
+            case "SUB": text += line(tab+1, `${retx} = U_32(${a} - ${b});`); break;
+            case "MUL": text += line(tab+1, `${retx} = U_32(${a} * ${b});`); break;
+            case "DIV": text += line(tab+1, `${retx} = U_32(${a} / ${b});`); break;
+            case "MOD": text += line(tab+1, `${retx} = U_32(${a} % ${b});`); break;
+            case "AND": text += line(tab+1, `${retx} = U_32(${a} & ${b});`); break;
+            case "OR" : text += line(tab+1, `${retx} = U_32(${a} | ${b});`); break;
+            case "XOR": text += line(tab+1, `${retx} = U_32(${a} ^ ${b});`); break;
+            case "SHL": text += line(tab+1, `${retx} = U_32(${a} << ${b});`); break;
+            case "SHR": text += line(tab+1, `${retx} = U_32(${a} >> ${b});`); break;
+            case "LTN": text += line(tab+1, `${retx} = U_32(${a} < ${b} ? 1 : 0);`); break;
+            case "LTE": text += line(tab+1, `${retx} = U_32(${a} <= ${b} ? 1 : 0);`); break;
+            case "EQL": text += line(tab+1, `${retx} = U_32(${a} == ${b} ? 1 : 0);`); break;
+            case "GTE": text += line(tab+1, `${retx} = U_32(${a} >= ${b} ? 1 : 0);`); break;
+            case "GTN": text += line(tab+1, `${retx} = U_32(${a} > ${b} ? 1 : 0);`); break;
+            case "NEQ": text += line(tab+1, `${retx} = U_32(${a} != ${b} ? 1 : 0);`); break;
+          }
+          // End optimization
+          text += line(tab+1, "inc_cost(mem);");
+          text += line(tab+0, "} else {");
+        }
+        text += line(tab+1, VAR(target) + " " + name + " = alloc(mem, 2);");
+        text += line(tab+1, "link(mem, " + name+"+"+U64(target,0)+", " + val0 + ");");
+        text += line(tab+1, "link(mem, " + name+"+"+U64(target,1)+", " + val1 + ");");
+        text += line(tab+1, retx + " = " + "Op2(" + term.oper.toUpperCase() + ", " + name + ");");
+        if (INLINE_NUMBERS) {
+          text += line(tab+0, "}");
+        }
+        return retx;
       case "U32":
         return "U_32(" + U64(target,term.numb) + ")";
     }

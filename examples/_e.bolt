@@ -1,4 +1,10 @@
-(Count 0) = 0
-(Count n) = (+ 1 (Count (- n 1)))
+(Loop 0 0) = 0
+(Loop 0 r) = r
+(Loop n r) = (Loop (- n 1) (+ r 1))
 
-(Main) = (Count 20000000)
+(Main) = (Tuple
+  (Loop 200000000 0)
+  (Loop 200000000 0)
+  (Loop 200000000 0)
+  (Loop 200000000 0)
+)
