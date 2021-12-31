@@ -8,9 +8,14 @@
 typedef unsigned char u8;
 typedef unsigned int u32;
 typedef unsigned long long int u64;
+typedef pthread_t Thd;
 
 // Consts
 // ------
+
+const u64 U64_PER_KB = 0x80;
+const u64 U64_PER_MB = 0x20000;
+const u64 U64_PER_GB = 0x8000000;
 
 const u64 MAX_WORKERS = 8;
 const u64 MAX_DYNFUNS = 65536;
@@ -74,16 +79,12 @@ typedef struct {
 } Arr;
 
 typedef struct {
-  Arr  nodes;
+  Arr* nodes;
   Arr  free[16];
   u32* stack;
-  u64  cost;
-} Mem;
-
-typedef struct {
-  pthread_t thread;
-  Mem* mem;
-  u64 host;
+  u64  cost; // for some reason, moving this up on this struct causes a 5% drop in performance - why?
+  u64  host;
+  Thd  thread;
 } Worker;
 
 // Dynbook
@@ -213,23 +214,23 @@ u64 get_loc(Lnk lnk, u64 arg) {
   return get_val(lnk) + arg;
 }
 
-Lnk ask_arg(Mem* mem, Lnk term, u64 arg) {
-  return array_read(&mem->nodes, get_loc(term, arg));
+Lnk ask_arg(Worker* mem, Lnk term, u64 arg) {
+  return array_read(mem->nodes, get_loc(term, arg));
 }
 
-Lnk ask_lnk(Mem* mem, u64 loc) {
-  return array_read(&mem->nodes, loc);
+Lnk ask_lnk(Worker* mem, u64 loc) {
+  return array_read(mem->nodes, loc);
 }
 
-u64 link(Mem* mem, u64 loc, Lnk lnk) {
-  array_write(&mem->nodes, loc, lnk);
+u64 link(Worker* mem, u64 loc, Lnk lnk) {
+  array_write(mem->nodes, loc, lnk);
   if (get_tag(lnk) <= VAR) {
-    array_write(&mem->nodes, get_loc(lnk, get_tag(lnk) == DP1 ? 1 : 0), Arg(loc));
+    array_write(mem->nodes, get_loc(lnk, get_tag(lnk) == DP1 ? 1 : 0), Arg(loc));
   }
   return lnk;
 }
 
-u64 alloc(Mem* mem, u64 size) {
+u64 alloc(Worker* mem, u64 size) {
   if (size == 0) {
     return 0;
   } else {
@@ -239,14 +240,12 @@ u64 alloc(Mem* mem, u64 size) {
         return reuse;
       }
     }
-    return __atomic_fetch_add(&mem->nodes.size, size, __ATOMIC_RELAXED);
+    return __atomic_fetch_add(&mem->nodes->size, size, __ATOMIC_RELAXED);
   }
 }
 
-void clear(Mem* mem, u64 loc, u64 size) {
-  //mem->free[size].data[mem->free[size].size++] = loc;
+void clear(Worker* mem, u64 loc, u64 size) {
   array_push(&mem->free[size], loc);
-  // TODO
 }
 
 // Debug
@@ -280,7 +279,7 @@ void debug_print_lnk(Lnk x) {
 // Garbage Collection
 // ------------------
 
-void collect(Mem* mem, Lnk term) {
+void collect(Worker* mem, Lnk term) {
   return;
   switch (get_tag(term)) {
     case DP0: {
@@ -339,11 +338,11 @@ void collect(Mem* mem, Lnk term) {
 // Terms
 // -----
 
-void inc_cost(Mem* mem) {
+void inc_cost(Worker* mem) {
   mem->cost++;
 }
 
-void subst(Mem* mem, Lnk lnk, Lnk val) {
+void subst(Worker* mem, Lnk lnk, Lnk val) {
   if (get_tag(lnk) != ERA) {
     link(mem, get_loc(lnk,0), val);
   } else {
@@ -351,7 +350,7 @@ void subst(Mem* mem, Lnk lnk, Lnk val) {
   }
 }
 
-Lnk app_lam(Mem* mem, u64 host, Lnk term, Lnk arg0) {
+Lnk app_lam(Worker* mem, u64 host, Lnk term, Lnk arg0) {
   inc_cost(mem);
   subst(mem, ask_arg(mem, arg0, 0), ask_arg(mem, term, 1));
   u64 done = link(mem, host, ask_arg(mem, arg0, 1));
@@ -360,7 +359,7 @@ Lnk app_lam(Mem* mem, u64 host, Lnk term, Lnk arg0) {
   return done;
 }
 
-Lnk app_par(Mem* mem, u64 host, Lnk term, Lnk arg0) {
+Lnk app_par(Worker* mem, u64 host, Lnk term, Lnk arg0) {
   inc_cost(mem);
   u64 app0 = get_loc(term, 0);
   u64 app1 = get_loc(arg0, 0);
@@ -378,7 +377,7 @@ Lnk app_par(Mem* mem, u64 host, Lnk term, Lnk arg0) {
   return done;
 }
 
-Lnk op2_u32_u32(Mem* mem, u64 host, Lnk term, Lnk arg0, Lnk arg1) {
+Lnk op2_u32_u32(Worker* mem, u64 host, Lnk term, Lnk arg0, Lnk arg1) {
   inc_cost(mem);
   u64 a = get_val(arg0);
   u64 b = get_val(arg1);
@@ -407,7 +406,7 @@ Lnk op2_u32_u32(Mem* mem, u64 host, Lnk term, Lnk arg0, Lnk arg1) {
   return done;
 }
 
-Lnk op2_par_0(Mem* mem, u64 host, Lnk term, Lnk arg0, Lnk arg1) {
+Lnk op2_par_0(Worker* mem, u64 host, Lnk term, Lnk arg0, Lnk arg1) {
   inc_cost(mem);
   u64 op20 = get_loc(term, 0);
   u64 op21 = get_loc(arg0, 0);
@@ -425,7 +424,7 @@ Lnk op2_par_0(Mem* mem, u64 host, Lnk term, Lnk arg0, Lnk arg1) {
   return done;
 }
 
-Lnk op2_par_1(Mem* mem, u64 host, Lnk term, Lnk arg0, Lnk arg1) {
+Lnk op2_par_1(Worker* mem, u64 host, Lnk term, Lnk arg0, Lnk arg1) {
   inc_cost(mem);
   u64 op20 = get_loc(term, 0);
   u64 op21 = get_loc(arg1, 0);
@@ -443,7 +442,7 @@ Lnk op2_par_1(Mem* mem, u64 host, Lnk term, Lnk arg0, Lnk arg1) {
   return done;
 }
 
-Lnk let_lam(Mem* mem, u64 host, Lnk term, Lnk arg0) {
+Lnk let_lam(Worker* mem, u64 host, Lnk term, Lnk arg0) {
   inc_cost(mem);
   u64 let0 = get_loc(term, 0);
   u64 par0 = get_loc(arg0, 0);
@@ -465,7 +464,7 @@ Lnk let_lam(Mem* mem, u64 host, Lnk term, Lnk arg0) {
   return done;
 }
 
-Lnk let_par_eq(Mem* mem, u64 host, Lnk term, Lnk arg0) {
+Lnk let_par_eq(Worker* mem, u64 host, Lnk term, Lnk arg0) {
   inc_cost(mem);
   subst(mem, ask_arg(mem,term,0), ask_arg(mem,arg0,0));
   subst(mem, ask_arg(mem,term,1), ask_arg(mem,arg0,1));
@@ -475,7 +474,7 @@ Lnk let_par_eq(Mem* mem, u64 host, Lnk term, Lnk arg0) {
   return done;
 }
 
-Lnk let_par_df(Mem* mem, u64 host, Lnk term, Lnk arg0) {
+Lnk let_par_df(Worker* mem, u64 host, Lnk term, Lnk arg0) {
   inc_cost(mem);
   u64 par0 = alloc(mem, 2);
   u64 let0 = get_loc(term,0);
@@ -496,7 +495,7 @@ Lnk let_par_df(Mem* mem, u64 host, Lnk term, Lnk arg0) {
   return done;
 }
 
-Lnk let_u32(Mem* mem, u64 host, Lnk term, Lnk arg0) {
+Lnk let_u32(Worker* mem, u64 host, Lnk term, Lnk arg0) {
   inc_cost(mem);
   subst(mem, ask_arg(mem,term,0), arg0);
   subst(mem, ask_arg(mem,term,1), arg0);
@@ -505,7 +504,7 @@ Lnk let_u32(Mem* mem, u64 host, Lnk term, Lnk arg0) {
   return done;
 }
 
-Lnk let_ctr(Mem* mem, u64 host, Lnk term, Lnk arg0) {
+Lnk let_ctr(Worker* mem, u64 host, Lnk term, Lnk arg0) {
   inc_cost(mem);
   u64 func = get_ext(arg0);
   u64 arit = get_ari(arg0);
@@ -535,7 +534,7 @@ Lnk let_ctr(Mem* mem, u64 host, Lnk term, Lnk arg0) {
   }
 }
 
-Lnk cal_par(Mem* mem, u64 host, Lnk term, Lnk argn, u64 n) {
+Lnk cal_par(Worker* mem, u64 host, Lnk term, Lnk argn, u64 n) {
   inc_cost(mem);
   u64 arit = get_ari(term);
   u64 func = get_ext(term);
@@ -562,7 +561,7 @@ Lnk cal_par(Mem* mem, u64 host, Lnk term, Lnk argn, u64 n) {
 }
 
 Lnk cal_ctrs(
-  Mem* mem,
+  Worker* mem,
   u64 host,
   Arr clrs,
   Arr cols,
@@ -572,7 +571,6 @@ Lnk cal_ctrs(
   Arr args
 ) {
   inc_cost(mem);
-  u64* data = mem->nodes.data;
   u64 size = body.size;
   u64 aloc = alloc(mem, size);
   //printf("- cal_ctrs | size: %llu | aloc: %llu\n", size, aloc);
@@ -588,7 +586,7 @@ Lnk cal_ctrs(
       u64 out = fld == 0xFF ? args.data[arg] : ask_arg(mem, args.data[arg], fld);
       link(mem, aloc + i, out);
     } else {
-      array_write(&mem->nodes, aloc + i, lnk + (get_tag(lnk) < U32 ? aloc : 0));
+      array_write(mem->nodes, aloc + i, lnk + (get_tag(lnk) < U32 ? aloc : 0));
     }
   }
   u64 root_lnk;
@@ -615,7 +613,7 @@ Lnk cal_ctrs(
   return done;
 }
 
-u64 reduce_page(Mem* mem, u64 host, Lnk term, Page* page) {
+u64 reduce_page(Worker* mem, u64 host, Lnk term, Page* page) {
   //printf("- entering page...\n");
   u64 args_data[page->match.size];
   for (u64 arg_index = 0; arg_index < page->match.size; ++arg_index) {
@@ -656,7 +654,7 @@ u64 reduce_page(Mem* mem, u64 host, Lnk term, Page* page) {
 }
 
 
-Lnk reduce(Mem* mem, u64 root) {
+Lnk reduce(Worker* mem, u64 root) {
   u32* stack = mem->stack;
 
   u64 init = 1;
@@ -853,7 +851,7 @@ void normal_fork(u64 tid, u64 host);
 void normal_join(u64 tid);
 
 u64 CAN_SPAWN_THREADS = 1;
-Lnk normal_cont(Mem* mem, u64 host, u64* seen) {
+Lnk normal_cont(Worker* mem, u64 host, u64* seen) {
   Lnk term = ask_lnk(mem, host);
   //printf("normal "); debug_print_lnk(term); printf("\n");
   if (get_bit(seen, host)) {
@@ -908,7 +906,7 @@ Lnk normal_cont(Mem* mem, u64 host, u64* seen) {
   }
 }
 
-Lnk normal(Mem* mem, u64 host) {
+Lnk normal(Worker* mem, u64 host) {
   const u64 size = 4194304; // uses 32 MB, covers heaps up to 2 GB
   static u64 seen[size]; 
   for (u64 i = 0; i < size; ++i) {
@@ -919,7 +917,7 @@ Lnk normal(Mem* mem, u64 host) {
 
 void *normal_thread(void *args_ptr) {
   u64 tid = (u64)args_ptr;
-  normal(workers[tid].mem, workers[tid].host);
+  normal(&workers[tid], workers[tid].host);
   return 0;
 }
 
@@ -1002,18 +1000,21 @@ u64 ffi_get_size() {
 void ffi_normal(u8* mem_data, u32 mem_size, u32 host) {
 
   // Init thread objects
-  Mem mem;
-  mem.nodes.data = (u64*)mem_data;
-  mem.nodes.size = (u64)mem_size;
-  for (u64 i = 0; i < 16; ++i) {
-    mem.free[i].size = 0;
-    mem.free[i].data = malloc(256 * 1024 * 1024 * sizeof(u64));
-  }
-  mem.stack = malloc(64 * 1024 * 1024 * sizeof(u64)); // 64 MB
-  mem.cost = 0;
+  Arr nodes;
+  nodes.data = (u64*)mem_data;
+  nodes.size = (u64)mem_size;
+
   for (u64 t = 0; t < MAX_WORKERS; ++t) {
+    for (u64 i = 0; i < 16; ++i) {
+      workers[0].free[i].size = 0;
+      //workers[0].free[i].data = malloc(256 * 1024 * 1024 * sizeof(u64));
+      workers[0].free[i].data = malloc(64l * U64_PER_MB * sizeof(u64)); // 64 MB
+    }
+    //workers[t].stack = malloc(256 * 1024 * 1024 * sizeof(u64)); // tava ocupando 2gb
+    workers[t].stack = malloc(256l * U64_PER_MB * sizeof(u64)); // 1gb
+    workers[t].cost = 0;
     workers[t].thread = NULL;
-    workers[t].mem = &mem;
+    workers[t].nodes = &nodes;
   }
 
   //printf("got: %llu %llu %llu\n", get_tag(mem.data[0])/TAG, get_ext(mem.data[0])/EXT, get_val(mem.data[0]));
@@ -1037,10 +1038,15 @@ void ffi_normal(u8* mem_data, u32 mem_size, u32 host) {
       free(page);
     }
   }
-  free(mem.stack);
+
+  // Clears workers
+  ffi_cost = 0;
+  for (u64 t = 0; t < MAX_WORKERS; ++t) {
+    free(workers[t].stack);
+    ffi_cost += workers[t].cost;
+  }
   
-  ffi_cost = mem.cost;
-  ffi_size = mem.nodes.size;
+  ffi_size = nodes.size;
 }
 
 // Main
