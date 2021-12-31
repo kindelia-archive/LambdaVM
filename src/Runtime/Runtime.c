@@ -20,9 +20,11 @@ const u64 U64_PER_KB = 0x80;
 const u64 U64_PER_MB = 0x20000;
 const u64 U64_PER_GB = 0x8000000;
 
-const u64 MAX_WORKERS = 8;
+const u64 MAX_WORKERS = 4;
 const u64 MAX_DYNFUNS = 65536;
 const u64 MAX_ARITY = 16;
+
+const u64 MEM_SPACE = U64_PER_GB;
 
 // Terms
 // -----
@@ -90,7 +92,8 @@ typedef struct {
 
 typedef struct {
   u64  tid;
-  Arr* nodes;
+  Lnk* node;
+  u64  size;
   Stk  free[MAX_ARITY];
   u64  cost; // for some reason, moving this up on this struct causes a 5% drop in performance - why?
   u64  host;
@@ -249,18 +252,20 @@ u64 get_loc(Lnk lnk, u64 arg) {
   return get_val(lnk) + arg;
 }
 
-Lnk ask_arg(Worker* mem, Lnk term, u64 arg) {
-  return array_read(mem->nodes, get_loc(term, arg));
+Lnk ask_lnk(Worker* mem, u64 loc) {
+  return mem->node[loc];
 }
 
-Lnk ask_lnk(Worker* mem, u64 loc) {
-  return array_read(mem->nodes, loc);
+Lnk ask_arg(Worker* mem, Lnk term, u64 arg) {
+  return ask_lnk(mem, get_loc(term, arg));
 }
 
 u64 link(Worker* mem, u64 loc, Lnk lnk) {
-  array_write(mem->nodes, loc, lnk);
+  mem->node[loc] = lnk;
+  //array_write(mem->nodes, loc, lnk);
   if (get_tag(lnk) <= VAR) {
-    array_write(mem->nodes, get_loc(lnk, get_tag(lnk) == DP1 ? 1 : 0), Arg(loc));
+    mem->node[get_loc(lnk, get_tag(lnk) == DP1 ? 1 : 0)] = Arg(loc);
+    //array_write(mem->nodes, get_loc(lnk, get_tag(lnk) == DP1 ? 1 : 0), Arg(loc));
   }
   return lnk;
 }
@@ -275,7 +280,10 @@ u64 alloc(Worker* mem, u64 size) {
         return reuse;
       }
     }
-    return __atomic_fetch_add(&mem->nodes->size, size, __ATOMIC_RELAXED);
+    u64 loc = mem->size;
+    mem->size += size;
+    return mem->tid * MEM_SPACE + loc;
+    //return __atomic_fetch_add(&mem->nodes->size, size, __ATOMIC_RELAXED);
   }
 }
 
@@ -620,7 +628,8 @@ Lnk cal_ctrs(
       u64 out = fld == 0xFF ? args.data[arg] : ask_arg(mem, args.data[arg], fld);
       link(mem, aloc + i, out);
     } else {
-      array_write(mem->nodes, aloc + i, lnk + (get_tag(lnk) < U32 ? aloc : 0));
+      mem->node[aloc + i] = lnk + (get_tag(lnk) < U32 ? aloc : 0);
+      //array_write(mem->nodes, aloc + i, lnk + (get_tag(lnk) < U32 ? aloc : 0));
     }
   }
   u64 root_lnk;
@@ -928,11 +937,11 @@ Lnk normal_go(Worker* mem, u64 host, u64* seen) {
         u64 arity = (u64)get_ari(term);
         if (CAN_SPAWN_THREADS && arity > 1 && arity <= MAX_WORKERS) {
           CAN_SPAWN_THREADS = 0;
-          for (u64 t = 0; t < arity; ++t) {
-            normal_fork(t, get_loc(term,t));
+          for (u64 tid = 0; tid < arity; ++tid) {
+            normal_fork(tid, get_loc(term, tid));
           }
-          for (u64 t = 0; t < arity; ++t) {
-            normal_join(t);
+          for (u64 tid = 0; tid < arity; ++tid) {
+            normal_join(tid);
           }
         } else {
           for (u64 i = 0; i < arity; ++i) {
@@ -1042,13 +1051,13 @@ u64 ffi_get_size() {
 void ffi_normal(u8* mem_data, u32 mem_size, u32 host) {
 
   // Init thread objects
-  Arr nodes;
-  nodes.data = (u64*)mem_data;
-  nodes.size = (u64)mem_size;
-
+  //Arr node;
+  //node.data = (u64*)mem_data;
+  //node.size = (u64)mem_size;
   for (u64 t = 0; t < MAX_WORKERS; ++t) {
     workers[t].tid = t;
-    workers[t].nodes = &nodes;
+    workers[t].size = t == 0 ? (u64)mem_size : 0l;
+    workers[t].node = (u64*)mem_data;
     for (u64 a = 0; a < MAX_ARITY; ++a) {
       stk_init(&workers[t].free[a]);
     }
@@ -1079,14 +1088,14 @@ void ffi_normal(u8* mem_data, u32 mem_size, u32 host) {
 
   // Clears workers
   ffi_cost = 0;
+  ffi_size = 0;
   for (u64 t = 0; t < MAX_WORKERS; ++t) {
     for (u64 a = 0; a < MAX_ARITY; ++a) {
       stk_free(&workers[t].free[a]);
     }
     ffi_cost += workers[t].cost;
+    ffi_size += workers[t].size;
   }
-  
-  ffi_size = nodes.size;
 }
 
 // Main
