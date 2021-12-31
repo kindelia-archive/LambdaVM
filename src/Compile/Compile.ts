@@ -85,10 +85,12 @@ export function compile_group_step_0(
       text += line(tab+1, "init = 0;");
       text += line(tab+1, "continue;");
     } else {
-      text += line(tab+1, "stack[size++] = host;");
+      //text += line(tab+1, "stack[size++] = host;");
+      text += line(tab+1, "stk_push(&stack, host);");
       for (var i = 0; i < stricts.length; ++i) {
         if (i < stricts.length - 1) {
-          text += line(tab+1, "stack[size++] = get_loc(term, "+stricts[i]+") | 0x80000000;");
+          //text += line(tab+1, "stack[size++] = get_loc(term, "+stricts[i]+") | 0x80000000;");
+          text += line(tab+1, "stk_push(&stack, get_loc(term, "+stricts[i]+") | 0x80000000);");
         } else {
           text += line(tab+1, "host = get_loc(term, "+stricts[i]+");");
         }

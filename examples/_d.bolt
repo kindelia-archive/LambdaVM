@@ -1,4 +1,43 @@
-(Loop 0) = 42
-(Loop n) = (Loop (- n 1))
+(Main) =
+  let y = λf ((λr (f (r r))) (λr (f (r r))))
+  let s = λn λz λs (s n)
+  let z = λz λs z
+  let f = (y λslow λn (n 1 λpred(+ (slow pred) (slow pred))))
+  (+
+    (f (s (s (s (s (s (s (s (s (s (s (s (s (s (s (s (s (s (s (s (s (s (s z)))))))))))))))))))))))
+    (f (s (s (s (s (s (s (s (s (s (s (s (s (s (s (s (s (s (s (s (s (s (s z)))))))))))))))))))))))
+  )
 
-(Main) = (Loop 100000000)
+
+
+//(foo 0 a b) = a
+//(foo 1 a b) = b
+
+
+//(foo (heavy_comp_a) (heavy_comp_b) (heavy_comp_c))
+     ///\             /\             /\
+     //---------------------- spawn 3 threads ??? = wasted effort
+
+
+
+
+//run x = (sum large_tree) // 4 cores
+//run y = (sum large_tree) // 4 cores
+//x + y
+
+  //aaaaaaaaaaaaaaaaaaaaaaaaaas fndianfanf lnfl knsldnf l∫nfd kl¬sfdkl ¬fdkl¬l;jj
+
+  //(if
+    //(+
+      //(+
+        //(f 50)
+        //(f 50)
+      //)
+      //(+
+        //(f 50)
+        //(f 50)
+      //)
+    //)
+    //A
+    //B
+  //)

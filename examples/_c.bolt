@@ -1,5 +1,22 @@
-(Loop 0) = 42
-(Loop n) = (Loop (- n 1))
-
-//(Main) = (Loop 1000)
-(Main) = (Loop 100000000)
+(Main) =
+  let y = λf ((λr (f (r r))) (λr (f (r r))))
+  let s = λn λz λs (s n)
+  let z = λz λs z
+  let f = (y λslow λn (n (λx x) λpred((slow pred) (slow pred))))
+  (f 
+    //(s (s (s (s (s
+    (s (s
+    (s (s (s (s
+    (s (s (s (s
+    (s (s (s (s
+    (s (s (s (s
+    (s (s (s (s
+      z
+    ))))
+    ))))
+    ))))
+    ))))
+    ))))
+    ))
+    ////)))))
+  )

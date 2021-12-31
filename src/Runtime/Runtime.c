@@ -2,6 +2,9 @@
 #include <stdio.h>
 #include <pthread.h>
 
+#define LIKELY(x) __builtin_expect((x), 1)
+#define UNLIKELY(x) __builtin_expect((x), 0)
+
 // Types
 // -----
 
@@ -19,6 +22,7 @@ const u64 U64_PER_GB = 0x8000000;
 
 const u64 MAX_WORKERS = 8;
 const u64 MAX_DYNFUNS = 65536;
+const u64 MAX_ARITY = 16;
 
 // Terms
 // -----
@@ -79,9 +83,15 @@ typedef struct {
 } Arr;
 
 typedef struct {
+  u64* data;
+  u64  size;
+  u64  mcap;
+} Stk;
+
+typedef struct {
+  u64  tid;
   Arr* nodes;
-  Arr  free[16];
-  u32* stack;
+  Stk  free[MAX_ARITY];
   u64  cost; // for some reason, moving this up on this struct causes a 5% drop in performance - why?
   u64  host;
   Thd  thread;
@@ -123,13 +133,38 @@ u64 array_read(Arr* arr, u64 idx) {
   return arr->data[idx];
 }
 
-void array_push(Arr* arr, u64 value) {
-  array_write(arr, arr->size++, value);
+// Stack
+// -----
+
+u64 stk_growth_factor = 16;
+
+void stk_init(Stk* stack) {
+  stack->size = 0;
+  stack->mcap = stk_growth_factor;
+  stack->data = malloc(stack->mcap * sizeof(u64));
 }
 
-u64 array_pop(Arr* arr) {
-  if (arr->size > 0) {
-    return array_read(arr, --arr->size);
+void stk_free(Stk* stack) {
+  free(stack->data);
+}
+
+void stk_push(Stk* stack, u64 val) {
+  if (UNLIKELY(stack->size == stack->mcap)) { 
+    stack->mcap = stack->mcap * stk_growth_factor;
+    stack->data = realloc(stack->data, stack->mcap * sizeof(u64));
+  }
+  stack->data[stack->size++] = val;
+}
+
+u64 stk_pop(Stk* stack) {
+  if (LIKELY(stack->size > 0)) {
+    // TODO: shrink? -- impacts performance considerably
+    //if (stack->size == stack->mcap / stk_growth_factor) {
+      //stack->mcap = stack->mcap / stk_growth_factor;
+      //stack->data = realloc(stack->data, stack->mcap * sizeof(u64));
+      //printf("shrink %llu\n", stack->mcap);
+    //}
+    return stack->data[--stack->size];
   } else {
     return -1;
   }
@@ -231,11 +266,11 @@ u64 link(Worker* mem, u64 loc, Lnk lnk) {
 }
 
 u64 alloc(Worker* mem, u64 size) {
-  if (size == 0) {
+  if (UNLIKELY(size == 0)) {
     return 0;
   } else {
     if (size < 16) {
-      u64 reuse = array_pop(&mem->free[size]);
+      u64 reuse = stk_pop(&mem->free[size]);
       if (reuse != -1) {
         return reuse;
       }
@@ -245,7 +280,7 @@ u64 alloc(Worker* mem, u64 size) {
 }
 
 void clear(Worker* mem, u64 loc, u64 size) {
-  array_push(&mem->free[size], loc);
+  stk_push(&mem->free[size], loc);
 }
 
 // Debug
@@ -280,7 +315,6 @@ void debug_print_lnk(Lnk x) {
 // ------------------
 
 void collect(Worker* mem, Lnk term) {
-  return;
   switch (get_tag(term)) {
     case DP0: {
       link(mem, get_loc(term,0), Era());
@@ -653,9 +687,11 @@ u64 reduce_page(Worker* mem, u64 host, Lnk term, Page* page) {
   return matched;
 }
 
+Lnk reduce(Worker* mem, u64 root, u64 depth) {
+  Stk stack;
+  stk_init(&stack);
 
-Lnk reduce(Worker* mem, u64 root) {
-  u32* stack = mem->stack;
+  //u32* stack = mem->stack;
 
   u64 init = 1;
   u64 size = 1;
@@ -673,20 +709,24 @@ Lnk reduce(Worker* mem, u64 root) {
     if (init == 1) {
       switch (get_tag(term)) {
         case APP: {
-          stack[size++] = host;
+          stk_push(&stack, host);
+          //stack[size++] = host;
           init = 1;
           host = get_loc(term, 0);
           continue;
         }
         case DP0:
         case DP1: {
-          stack[size++] = host;
+          stk_push(&stack, host);
+          //stack[size++] = host;
           host = get_loc(term, 2);
           continue;
         }
         case OP2: {
-          stack[size++] = host;
-          stack[size++] = get_loc(term, 0) | 0x80000000;
+          stk_push(&stack, host);
+          stk_push(&stack, get_loc(term, 0) | 0x80000000);
+          //stack[size++] = host;
+          //stack[size++] = get_loc(term, 0) | 0x80000000;
           host = get_loc(term, 1);
           continue;
         }
@@ -713,11 +753,13 @@ Lnk reduce(Worker* mem, u64 root) {
           #ifdef USE_DYNAMIC
           Page* page = book[fun];
           if (page) {
-            stack[size++] = host;
+            stk_push(&stack, host);
+            //stack[size++] = host;
             for (u64 arg_index = 0; arg_index < page->match.size; ++arg_index) {
               if (page->match.data[arg_index] > 0) {
                 //printf("- ue %llu\n", arg_index);
-                stack[size++] = get_loc(term, arg_index) | 0x80000000;
+                stk_push(&stack, get_loc(term, arg_index) | 0x80000000);
+                //stack[size++] = get_loc(term, arg_index) | 0x80000000;
               }
             }
             break;
@@ -823,13 +865,13 @@ Lnk reduce(Worker* mem, u64 root) {
       }
     }
 
-    if (size > 0) {
-      u64 item = stack[--size];
+    u64 item = stk_pop(&stack);
+    if (item == -1) {
+      break;
+    } else {
       init = item >> 31;
       host = item & 0x7FFFFFFF;
       continue;
-    } else {
-      break;
     }
 
   }
@@ -851,35 +893,35 @@ void normal_fork(u64 tid, u64 host);
 void normal_join(u64 tid);
 
 u64 CAN_SPAWN_THREADS = 1;
-Lnk normal_cont(Worker* mem, u64 host, u64* seen) {
+Lnk normal_go(Worker* mem, u64 host, u64* seen) {
   Lnk term = ask_lnk(mem, host);
   //printf("normal "); debug_print_lnk(term); printf("\n");
   if (get_bit(seen, host)) {
     return term;
   } else {
-    term = reduce(mem, host);
+    term = reduce(mem, host, 0);
     set_bit(seen, host);
     switch (get_tag(term)) {
       case LAM: {
-        link(mem, get_loc(term,1), normal_cont(mem, get_loc(term,1), seen));
+        link(mem, get_loc(term,1), normal_go(mem, get_loc(term,1), seen));
         return term;
       }
       case APP: {
-        link(mem, get_loc(term,0), normal_cont(mem, get_loc(term,0), seen));
-        link(mem, get_loc(term,1), normal_cont(mem, get_loc(term,1), seen));
+        link(mem, get_loc(term,0), normal_go(mem, get_loc(term,0), seen));
+        link(mem, get_loc(term,1), normal_go(mem, get_loc(term,1), seen));
         return term;
       }
       case PAR: {
-        link(mem, get_loc(term,0), normal_cont(mem, get_loc(term,0), seen));
-        link(mem, get_loc(term,1), normal_cont(mem, get_loc(term,1), seen));
+        link(mem, get_loc(term,0), normal_go(mem, get_loc(term,0), seen));
+        link(mem, get_loc(term,1), normal_go(mem, get_loc(term,1), seen));
         return term;
       }
       case DP0: {
-        link(mem, get_loc(term,2), normal_cont(mem, get_loc(term,2), seen));
+        link(mem, get_loc(term,2), normal_go(mem, get_loc(term,2), seen));
         return term;
       }
       case DP1: {
-        link(mem, get_loc(term,2), normal_cont(mem, get_loc(term,2), seen));
+        link(mem, get_loc(term,2), normal_go(mem, get_loc(term,2), seen));
         return term;
       }
       case CTR: case FUN: {
@@ -894,7 +936,7 @@ Lnk normal_cont(Worker* mem, u64 host, u64* seen) {
           }
         } else {
           for (u64 i = 0; i < arity; ++i) {
-            link(mem, get_loc(term,i), normal_cont(mem, get_loc(term,i), seen));
+            link(mem, get_loc(term,i), normal_go(mem, get_loc(term,i), seen));
           }
         }
         return term;
@@ -912,7 +954,7 @@ Lnk normal(Worker* mem, u64 host) {
   for (u64 i = 0; i < size; ++i) {
     seen[i] = 0;
   }
-  return normal_cont(mem, host, seen);
+  return normal_go(mem, host, seen);
 }
 
 void *normal_thread(void *args_ptr) {
@@ -1005,19 +1047,15 @@ void ffi_normal(u8* mem_data, u32 mem_size, u32 host) {
   nodes.size = (u64)mem_size;
 
   for (u64 t = 0; t < MAX_WORKERS; ++t) {
-    for (u64 i = 0; i < 16; ++i) {
-      workers[0].free[i].size = 0;
-      //workers[0].free[i].data = malloc(256 * 1024 * 1024 * sizeof(u64));
-      workers[0].free[i].data = malloc(64l * U64_PER_MB * sizeof(u64)); // 64 MB
-    }
-    //workers[t].stack = malloc(256 * 1024 * 1024 * sizeof(u64)); // tava ocupando 2gb
-    workers[t].stack = malloc(256l * U64_PER_MB * sizeof(u64)); // 1gb
-    workers[t].cost = 0;
-    workers[t].thread = NULL;
+    workers[t].tid = t;
     workers[t].nodes = &nodes;
+    for (u64 a = 0; a < MAX_ARITY; ++a) {
+      stk_init(&workers[t].free[a]);
+    }
+    workers[t].cost = 0;
+    workers[t].host = 0;
+    workers[t].thread = NULL;
   }
-
-  //printf("got: %llu %llu %llu\n", get_tag(mem.data[0])/TAG, get_ext(mem.data[0])/EXT, get_val(mem.data[0]));
 
   // Spawns the root worker
   normal_fork(0, (u64) host);
@@ -1042,7 +1080,9 @@ void ffi_normal(u8* mem_data, u32 mem_size, u32 host) {
   // Clears workers
   ffi_cost = 0;
   for (u64 t = 0; t < MAX_WORKERS; ++t) {
-    free(workers[t].stack);
+    for (u64 a = 0; a < MAX_ARITY; ++a) {
+      stk_free(&workers[t].free[a]);
+    }
     ffi_cost += workers[t].cost;
   }
   
