@@ -1,4 +1,1 @@
-(Foo 0) = 0
-(Foo a) = (* (+ a 5) 10)
-
-(Main) = (Foo 2)
+(Main) = (λf λx (f (f x)) λf λx (f (f x)))

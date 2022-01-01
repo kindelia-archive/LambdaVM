@@ -843,7 +843,7 @@ void set_bit(u64* bits, u64 bit) {
 }
 
 // gets the nth bit of a bit-array represented as a u64 array
-u8 get_bit(u64* bits, u8 bit) {
+u8 get_bit(u64* bits, u64 bit) {
   return (bits[bit >> 6] >> (bit & 0x3F)) & 1;
 }
 
