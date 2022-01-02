@@ -20,11 +20,12 @@
 
 (Slow n) = (Slow.go n 0)
   (Slow.go 0 r) = r
-  (Slow.go n r) = (Slow.go (- n 1) (+ r (Sum (Quicksort (Generate n 300000)))))
+  (Slow.go n r) = (Slow.go (- n 1) (+ r (Sum (Quicksort (Generate n 100000)))))
 
 (Main) = (Tuple
   (Slow 4)
-  //(Slow 4)
-  //(Slow 4)
+  (Slow 4)
+  (Slow 4)
+  (Slow 4)
   //(Slow 4)
 )

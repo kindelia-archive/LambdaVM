@@ -1,1 +1,9 @@
-(Main) = (λf λx (f (f x)) λf λx (f (f x)))
+//(Main) = (λf λx (f (f x)) λf λx (f (f x)))
+
+(Slow 0) = 1
+(Slow n) = (+ (Slow (- n 1)) (Slow (- n 1)))
+
+(Main) = (Tuple
+  (Slow 6)
+  (Slow 6)
+)

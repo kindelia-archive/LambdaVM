@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <pthread.h>
 
+#define PARALLEL
+
 #define LIKELY(x) __builtin_expect((x), 1)
 #define UNLIKELY(x) __builtin_expect((x), 0)
 
@@ -20,10 +22,13 @@ const u64 U64_PER_KB = 0x80;
 const u64 U64_PER_MB = 0x20000;
 const u64 U64_PER_GB = 0x8000000;
 
+#ifdef PARALLEL
 const u64 MAX_WORKERS = 4;
+#else
+const u64 MAX_WORKERS = 1;
+#endif
 const u64 MAX_DYNFUNS = 65536;
 const u64 MAX_ARITY = 16;
-
 const u64 MEM_SPACE = U64_PER_GB;
 
 // Terms
@@ -95,9 +100,19 @@ typedef struct {
   Lnk* node;
   u64  size;
   Stk  free[MAX_ARITY];
-  u64  cost; // for some reason, moving this up on this struct causes a 5% drop in performance - why?
-  u64  host;
+  u64  cost;
+
+  #ifdef PARALLEL
+  u64             has_work;
+  pthread_mutex_t has_work_mutex;
+  pthread_cond_t  has_work_signal;
+
+  u64             has_result;
+  pthread_mutex_t has_result_mutex;
+  pthread_cond_t  has_result_signal;
+
   Thd  thread;
+  #endif
 } Worker;
 
 // Dynbook
@@ -124,6 +139,9 @@ typedef Page** Book;
 
 Worker workers[MAX_WORKERS];
 Page* book[MAX_DYNFUNS];
+
+const u64 seen_size = 4194304; // uses 32 MB, covers heaps up to 2 GB
+u64 seen_data[seen_size]; 
 
 // Array
 // -----
@@ -847,89 +865,126 @@ u8 get_bit(u64* bits, u64 bit) {
   return (bits[bit >> 6] >> (bit & 0x3F)) & 1;
 }
 
+#ifdef PARALLEL
 void normal_fork(u64 tid, u64 host);
-void normal_join(u64 tid);
+u64  normal_join(u64 tid);
+u64 can_spawn = 1;
+#endif
 
-u64 CAN_SPAWN_THREADS = 1;
-Lnk normal_go(Worker* mem, u64 host, u64* seen) {
+Lnk normal(Worker* mem, u64 host) {
   Lnk term = ask_lnk(mem, host);
   //printf("normal "); debug_print_lnk(term); printf("\n");
-  if (get_bit(seen, host)) {
+  if (get_bit(seen_data, host)) {
     return term;
   } else {
     term = reduce(mem, host, 0);
-    set_bit(seen, host);
+    set_bit(seen_data, host);
+    u64 rec_size = 0;
+    u64 rec_locs[16];
     switch (get_tag(term)) {
       case LAM: {
-        link(mem, get_loc(term,1), normal_go(mem, get_loc(term,1), seen));
-        return term;
+        rec_locs[rec_size++] = get_loc(term,1);
+        break;
       }
       case APP: {
-        link(mem, get_loc(term,0), normal_go(mem, get_loc(term,0), seen));
-        link(mem, get_loc(term,1), normal_go(mem, get_loc(term,1), seen));
-        return term;
+        rec_locs[rec_size++] = get_loc(term,0);
+        rec_locs[rec_size++] = get_loc(term,1);
+        break;
       }
       case PAR: {
-        link(mem, get_loc(term,0), normal_go(mem, get_loc(term,0), seen));
-        link(mem, get_loc(term,1), normal_go(mem, get_loc(term,1), seen));
-        return term;
+        rec_locs[rec_size++] = get_loc(term,0);
+        rec_locs[rec_size++] = get_loc(term,1);
+        break;
       }
       case DP0: {
-        link(mem, get_loc(term,2), normal_go(mem, get_loc(term,2), seen));
-        return term;
+        rec_locs[rec_size++] = get_loc(term,2);
+        break;
       }
       case DP1: {
-        link(mem, get_loc(term,2), normal_go(mem, get_loc(term,2), seen));
-        return term;
+        rec_locs[rec_size++] = get_loc(term,2);
+        break;
       }
       case CTR: case FUN: {
         u64 arity = (u64)get_ari(term);
-        if (CAN_SPAWN_THREADS && arity > 1 && arity <= MAX_WORKERS) {
-          CAN_SPAWN_THREADS = 0;
-          for (u64 tid = 0; tid < arity; ++tid) {
-            normal_fork(tid, get_loc(term, tid));
-          }
-          for (u64 tid = 0; tid < arity; ++tid) {
-            normal_join(tid);
-          }
-        } else {
-          for (u64 i = 0; i < arity; ++i) {
-            link(mem, get_loc(term,i), normal_go(mem, get_loc(term,i), seen));
-          }
+        for (u64 i = 0; i < arity; ++i) {
+          rec_locs[rec_size++] = get_loc(term,i);
         }
-        return term;
-      }
-      default: {
-        return term;
+        break;
       }
     }
+    #ifdef PARALLEL
+    // TODO: create worker stack, allow re-spawning workers
+    if (can_spawn && rec_size > 1 && rec_size <= MAX_WORKERS) {
+      can_spawn = 0;
+
+      for (u64 tid = 1; tid < rec_size; ++tid) {
+        //printf("[%llu] spawn %llu\n", mem->tid, tid);
+        normal_fork(tid, rec_locs[tid]);
+      }
+
+      link(mem, rec_locs[0], normal(mem, rec_locs[0]));
+
+      for (u64 tid = 1; tid < rec_size; ++tid) {
+        //printf("[%llu] join %llu\n", mem->tid, tid);
+        link(mem, rec_locs[tid], normal_join(tid));
+      }
+
+    } else {
+      for (u64 i = 0; i < rec_size; ++i) {
+        link(mem, rec_locs[i], normal(mem, rec_locs[i]));
+      }
+    }
+    #else
+    for (u64 i = 0; i < rec_size; ++i) {
+      link(mem, rec_locs[i], normal(mem, rec_locs[i]));
+    }
+    #endif
+
+    return term;
   }
 }
 
-Lnk normal(Worker* mem, u64 host) {
-  const u64 size = 4194304; // uses 32 MB, covers heaps up to 2 GB
-  static u64 seen[size]; 
-  for (u64 i = 0; i < size; ++i) {
-    seen[i] = 0;
-  }
-  return normal_go(mem, host, seen);
+#ifdef PARALLEL
+
+// Normalizes in a separate thread
+void normal_fork(u64 tid, u64 host) {
+  pthread_mutex_lock(&workers[tid].has_work_mutex);
+  workers[tid].has_work = host;
+  pthread_cond_signal(&workers[tid].has_work_signal);
+  pthread_mutex_unlock(&workers[tid].has_work_mutex);
 }
 
-void *normal_thread(void *args_ptr) {
-  u64 tid = (u64)args_ptr;
-  normal(&workers[tid], workers[tid].host);
+// Waits the result of a forked normalizer
+u64 normal_join(u64 tid) {
+  while (1) {
+    pthread_mutex_lock(&workers[tid].has_result_mutex);
+    while (workers[tid].has_result == -1) {
+      pthread_cond_wait(&workers[tid].has_result_signal, &workers[tid].has_result_mutex);
+    }
+    u64 done = workers[tid].has_result;
+    workers[tid].has_result = -1;
+    pthread_mutex_unlock(&workers[tid].has_result_mutex);
+    return done;
+  }
+}
+
+// The normalizer worker
+void *worker(void *arg) {
+  u64 tid = (u64)arg;
+  while (1) {
+    pthread_mutex_lock(&workers[tid].has_work_mutex);
+    while (workers[tid].has_work == -1) {
+      pthread_cond_wait(&workers[tid].has_work_signal, &workers[tid].has_work_mutex);
+    }
+    workers[tid].has_result = normal(&workers[tid], workers[tid].has_work);
+    workers[tid].has_work = -1;
+    pthread_cond_signal(&workers[tid].has_result_signal);
+    pthread_mutex_unlock(&workers[tid].has_work_mutex);
+  }
   return 0;
 }
 
-void normal_fork(u64 tid, u64 host) {
-  printf("* spawning thread: %llu\n", tid);
-  workers[tid].host = host;
-  pthread_create(&workers[tid].thread, NULL, &normal_thread, (void*)tid);
-}
-
-void normal_join(u64 tid) {
-  pthread_join(workers[tid].thread, NULL);
-}
+#endif
 
 // FFI
 // ---
@@ -999,10 +1054,12 @@ u64 ffi_get_size() {
 
 void ffi_normal(u8* mem_data, u32 mem_size, u32 host) {
 
+  // Inits seen
+  for (u64 i = 0; i < seen_size; ++i) {
+    seen_data[i] = 0;
+  }
+
   // Init thread objects
-  //Arr node;
-  //node.data = (u64*)mem_data;
-  //node.size = (u64)mem_size;
   for (u64 t = 0; t < MAX_WORKERS; ++t) {
     workers[t].tid = t;
     workers[t].size = t == 0 ? (u64)mem_size : 0l;
@@ -1011,13 +1068,26 @@ void ffi_normal(u8* mem_data, u32 mem_size, u32 host) {
       stk_init(&workers[t].free[a]);
     }
     workers[t].cost = 0;
-    workers[t].host = 0;
+    #ifdef PARALLEL
+    workers[t].has_work = -1;
+    pthread_mutex_init(&workers[t].has_work_mutex, NULL);
+    pthread_cond_init(&workers[t].has_work_signal, NULL);
+    workers[t].has_result = -1;
+    pthread_mutex_init(&workers[t].has_result_mutex, NULL);
+    pthread_cond_init(&workers[t].has_result_signal, NULL);
     workers[t].thread = NULL;
+    #endif
   }
 
-  // Spawns the root worker
-  normal_fork(0, (u64) host);
-  normal_join(0);
+  // Spawns threads
+  #ifdef PARALLEL
+  for (u64 tid = 1; tid < MAX_WORKERS; ++tid) {
+    pthread_create(&workers[tid].thread, NULL, &worker, (void*)tid);
+  }
+  #endif
+
+  // Normalizes trm
+  normal(&workers[0], (u64) host);
   
   // Clears mallocs
   for (u64 i = 0; i < MAX_DYNFUNS; ++i) {
@@ -1035,15 +1105,27 @@ void ffi_normal(u8* mem_data, u32 mem_size, u32 host) {
     }
   }
 
-  // Clears workers
+  // Computes total cost and size
   ffi_cost = 0;
   ffi_size = 0;
-  for (u64 t = 0; t < MAX_WORKERS; ++t) {
+  for (u64 tid = 0; tid < MAX_WORKERS; ++tid) {
+    ffi_cost += workers[tid].cost;
+    ffi_size += workers[tid].size;
+  }
+
+  // TODO: stop pending threads
+
+  // Clears workers
+  for (u64 tid = 0; tid < MAX_WORKERS; ++tid) {
     for (u64 a = 0; a < MAX_ARITY; ++a) {
-      stk_free(&workers[t].free[a]);
+      stk_free(&workers[tid].free[a]);
     }
-    ffi_cost += workers[t].cost;
-    ffi_size += workers[t].size;
+    #ifdef PARALLEL
+    pthread_mutex_destroy(&workers[tid].has_work_mutex);
+    pthread_cond_destroy(&workers[tid].has_work_signal);
+    pthread_mutex_destroy(&workers[tid].has_result_mutex);
+    pthread_cond_destroy(&workers[tid].has_result_signal);
+    #endif
   }
 }
 
