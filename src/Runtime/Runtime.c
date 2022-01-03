@@ -1133,14 +1133,14 @@ void ffi_normal(u8* mem_data, u32 mem_size, u32 host) {
 // ----
 
 // Uncomment to test without Deno FFI
-//int main() {
-  //Mem mem;
-  //mem.size = 1;
-  //mem.data = (u64*)malloc(2 * 134217728 * sizeof(u64)); // 2gb
-  //mem.data[0] = Cal(0, $MAIN, 0);
-  //printf("Reducing...\n");
-  //normal_ffi((u8*)mem.data, mem.size, 0);
-  //printf("Done!\n");
-  //free(&mem.data);
-  //printf("rwt: %d\n", get_gas());
-//}
+int main() {
+  Worker mem;
+  mem.size = 1;
+  mem.node = (u64*)malloc(2 * 134217728 * sizeof(u64)); // 2gb
+  mem.node[0] = Cal(0, $MAIN, 0);
+  printf("Reducing...\n");
+  ffi_normal((u8*)mem.node, mem.size, 0);
+  printf("Done!\n");
+  free(&mem.node);
+  printf("rwt: %llu\n", ffi_cost);
+}
